@@ -1,25 +1,39 @@
-"""Stats routes with caching."""
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+"""Stats routes using Supabase REST API."""
+from fastapi import APIRouter
 
-from backend.app.api.deps import get_db
 from backend.app.schemas import StatsResponse
-from backend.app.services import metadata_service
+from backend.app.core.supabase_rest_client import get_supabase_rest
 from backend.app.core.cache import stats_cache, get_all_cache_stats, clear_all_caches
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("", response_model=StatsResponse)
-def get_stats(db: Session = Depends(get_db)):
+async def get_stats():
     """Get database statistics."""
     # Check cache
     cached = stats_cache.get("stats")
     if cached:
         return cached
     
-    # Fetch and cache
-    result = metadata_service.get_stats(db)
+    # Fetch from Supabase REST API
+    client = get_supabase_rest()
+    
+    video_count = await client.count("videos")
+    category_count = await client.count("categories")
+    cast_count = await client.count("cast_members")
+    
+    # Get studio count from videos
+    videos = await client.get("videos", select="studio")
+    studios = set(v.get("studio") for v in videos if v.get("studio"))
+    
+    result = {
+        "video_count": video_count,
+        "category_count": category_count,
+        "cast_count": cast_count,
+        "studio_count": len(studios)
+    }
+    
     stats_cache.set("stats", result)
     return result
 

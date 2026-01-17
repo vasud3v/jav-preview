@@ -1,17 +1,16 @@
-"""Category routes with caching."""
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+"""Category routes using Supabase REST API."""
+from fastapi import APIRouter, Query
 
-from backend.app.api.deps import get_db, settings
+from backend.app.core.config import settings
 from backend.app.schemas import CategoryResponse, PaginatedResponse
-from backend.app.services import metadata_service, video_service
+from backend.app.services import video_service_rest as video_service
 from backend.app.core.cache import categories_cache, category_videos_cache, generate_cache_key
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 @router.get("", response_model=list[CategoryResponse])
-def list_categories(db: Session = Depends(get_db)):
+async def list_categories():
     """Get all categories with video counts."""
     # Check cache
     cached = categories_cache.get("all_categories")
@@ -19,17 +18,16 @@ def list_categories(db: Session = Depends(get_db)):
         return cached
     
     # Fetch and cache
-    result = metadata_service.get_all_categories(db)
+    result = await video_service.get_all_categories()
     categories_cache.set("all_categories", result)
     return result
 
 
 @router.get("/{category}/videos", response_model=PaginatedResponse)
-def get_videos_by_category(
+async def get_videos_by_category(
     category: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """Get videos in a category."""
     if page_size is None:
@@ -43,6 +41,6 @@ def get_videos_by_category(
         return cached
     
     # Fetch and cache
-    result = video_service.get_videos_by_category(db, category, page, page_size)
+    result = await video_service.get_videos_by_category(category, page, page_size)
     category_videos_cache.set(cache_key, result)
     return result

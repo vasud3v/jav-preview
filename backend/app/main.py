@@ -1,17 +1,12 @@
-"""FastAPI application entry point."""
+"""FastAPI application entry point - REST API mode."""
 import signal
 import sys
-from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.core.config import settings
-from backend.app.core.database import engine
+from backend.app.core.supabase_rest_client import get_supabase_rest, close_supabase_rest
 from backend.app.api.router import api_router
-from backend.app.models import Base
-
-# Ensure database directory exists and create tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.app_name,
@@ -36,7 +31,14 @@ async def startup_event():
     print("=" * 60)
     print(f"{settings.app_name} v{settings.api_version}")
     print("=" * 60)
-    print(f"✓ Connected to Supabase")
+    
+    # Initialize Supabase REST client
+    try:
+        client = get_supabase_rest()
+        print(f"✓ Connected to Supabase REST API")
+    except Exception as e:
+        print(f"⚠ Supabase connection warning: {e}")
+    
     print(f"✓ API running on http://{settings.host}:{settings.port}")
     print(f"✓ Press Ctrl+C to stop gracefully")
     print("=" * 60)
@@ -48,8 +50,8 @@ async def shutdown_event():
     print("\n" + "=" * 60)
     print("SHUTTING DOWN GRACEFULLY")
     print("=" * 60)
-    print("✓ Closing database connections...")
-    engine.dispose()
+    print("✓ Closing Supabase REST client...")
+    await close_supabase_rest()
     print("✓ Backend stopped successfully")
     print("=" * 60)
 

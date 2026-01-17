@@ -1,17 +1,16 @@
-"""Studio routes with caching."""
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+"""Studio routes using Supabase REST API."""
+from fastapi import APIRouter, Query
 
-from backend.app.api.deps import get_db, settings
+from backend.app.core.config import settings
 from backend.app.schemas import StudioResponse, PaginatedResponse
-from backend.app.services import metadata_service, video_service
+from backend.app.services import video_service_rest as video_service
 from backend.app.core.cache import studios_cache, studio_videos_cache, generate_cache_key
 
 router = APIRouter(prefix="/studios", tags=["studios"])
 
 
 @router.get("", response_model=list[StudioResponse])
-def list_studios(db: Session = Depends(get_db)):
+async def list_studios():
     """Get all studios with video counts."""
     # Check cache
     cached = studios_cache.get("all_studios")
@@ -19,17 +18,16 @@ def list_studios(db: Session = Depends(get_db)):
         return cached
     
     # Fetch and cache
-    result = metadata_service.get_all_studios(db)
+    result = await video_service.get_all_studios()
     studios_cache.set("all_studios", result)
     return result
 
 
 @router.get("/{studio}/videos", response_model=PaginatedResponse)
-def get_videos_by_studio(
+async def get_videos_by_studio(
     studio: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """Get videos from a studio."""
     if page_size is None:
@@ -43,6 +41,6 @@ def get_videos_by_studio(
         return cached
     
     # Fetch and cache
-    result = video_service.get_videos_by_studio(db, studio, page, page_size)
+    result = await video_service.get_videos_by_studio(studio, page, page_size)
     studio_videos_cache.set(cache_key, result)
     return result

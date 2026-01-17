@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_key: str = ""
-    supabase_db_url: str = ""  # PostgreSQL connection string
+    supabase_db_url: str = ""  # Optional - not needed for REST API mode
     
     # Server
     host: str = "0.0.0.0"

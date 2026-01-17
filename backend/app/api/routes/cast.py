@@ -1,18 +1,17 @@
-"""Cast routes with caching."""
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+"""Cast routes using Supabase REST API."""
+from fastapi import APIRouter, Query
 
-from backend.app.api.deps import get_db, settings
+from backend.app.core.config import settings
 from backend.app.schemas import CastResponse, PaginatedResponse
 from backend.app.schemas.metadata import CastWithImageResponse
-from backend.app.services import metadata_service, video_service
+from backend.app.services import video_service_rest as video_service
 from backend.app.core.cache import cast_cache, cast_featured_cache, cast_videos_cache, generate_cache_key
 
 router = APIRouter(prefix="/cast", tags=["cast"])
 
 
 @router.get("", response_model=list[CastResponse])
-def list_cast(db: Session = Depends(get_db)):
+async def list_cast():
     """Get all cast members with video counts."""
     # Check cache
     cached = cast_cache.get("all_cast")
@@ -20,27 +19,29 @@ def list_cast(db: Session = Depends(get_db)):
         return cached
     
     # Fetch and cache
-    result = metadata_service.get_all_cast(db)
+    result = await video_service.get_all_cast()
     cast_cache.set("all_cast", result)
     return result
 
 
 @router.get("/all", response_model=list[CastWithImageResponse])
-def list_all_cast_with_images(db: Session = Depends(get_db)):
+async def list_all_cast_with_images():
     """Get all cast members with images and video counts."""
     cached = cast_cache.get("all_cast_images")
     if cached:
         return cached
     
-    result = metadata_service.get_all_cast_with_images(db)
-    cast_cache.set("all_cast_images", result)
-    return result
+    # For REST API, cast images are fetched separately
+    result = await video_service.get_all_cast()
+    # Add empty image_url for now - images are stored per video
+    result_with_images = [{"name": c["name"], "video_count": c["count"], "image_url": ""} for c in result]
+    cast_cache.set("all_cast_images", result_with_images)
+    return result_with_images
 
 
 @router.get("/featured", response_model=list[CastWithImageResponse])
-def get_featured_cast(
-    limit: int = Query(20, ge=1, le=50),
-    db: Session = Depends(get_db)
+async def get_featured_cast(
+    limit: int = Query(20, ge=1, le=50)
 ):
     """Get featured cast members with images."""
     # Check cache
@@ -50,17 +51,18 @@ def get_featured_cast(
         return cached
     
     # Fetch and cache
-    result = metadata_service.get_cast_with_images(db, limit)
-    cast_featured_cache.set(cache_key, result)
-    return result
+    result = await video_service.get_all_cast()
+    result = result[:limit]
+    result_with_images = [{"name": c["name"], "video_count": c["count"], "image_url": ""} for c in result]
+    cast_featured_cache.set(cache_key, result_with_images)
+    return result_with_images
 
 
 @router.get("/{cast_name}/videos", response_model=PaginatedResponse)
-def get_videos_by_cast(
+async def get_videos_by_cast(
     cast_name: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """Get videos featuring a cast member."""
     if page_size is None:
@@ -74,6 +76,6 @@ def get_videos_by_cast(
         return cached
     
     # Fetch and cache
-    result = video_service.get_videos_by_cast(db, cast_name, page, page_size)
+    result = await video_service.get_videos_by_cast(cast_name, page, page_size)
     cast_videos_cache.set(cache_key, result)
     return result

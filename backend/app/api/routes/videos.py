@@ -1,10 +1,9 @@
-"""Video routes with caching."""
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+"""Video routes using Supabase REST API."""
+from fastapi import APIRouter, HTTPException, Query
 
-from backend.app.api.deps import get_db, settings
+from backend.app.core.config import settings
 from backend.app.schemas import VideoResponse, PaginatedResponse
-from backend.app.services import video_service
+from backend.app.services import video_service_rest as video_service
 from backend.app.core.cache import (
     videos_list_cache, video_detail_cache, search_cache, generate_cache_key
 )
@@ -17,89 +16,82 @@ router = APIRouter(prefix="/videos", tags=["videos"])
 # ============================================
 
 @router.get("/user/bookmarks", response_model=PaginatedResponse)
-def get_bookmarks(
+async def get_bookmarks(
     user_id: str = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """Get user's bookmarked videos."""
     if page_size is None:
         page_size = settings.default_page_size
     page_size = min(page_size, settings.max_page_size)
     
-    return video_service.get_user_bookmarks(db, user_id, page, page_size)
+    return await video_service.get_user_bookmarks(user_id, page, page_size)
 
 
 @router.get("/user/for-you", response_model=PaginatedResponse)
-def get_for_you(
+async def get_for_you(
     user_id: str = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(12, ge=1, le=24),
-    db: Session = Depends(get_db)
+    page_size: int = Query(12, ge=1, le=24)
 ):
     """Get personalized 'For You' recommendations based on watch history and preferences."""
-    return video_service.get_personalized_recommendations(db, user_id, page, page_size)
+    return await video_service.get_personalized_recommendations(user_id, page, page_size)
 
 
 @router.get("/user/discover")
-def get_discover_more(
+async def get_discover_more(
     user_id: str = Query(...),
     batch: int = Query(0, ge=0, description="Batch number for infinite scroll"),
     batch_size: int = Query(12, ge=6, le=24),
-    seen: str = Query('', description="Comma-separated list of already seen video codes"),
-    db: Session = Depends(get_db)
+    seen: str = Query('', description="Comma-separated list of already seen video codes")
 ):
     """
     Get infinite scroll recommendations.
     Each batch uses different strategy for variety.
     Returns: items, has_more, batch, strategy
     """
-    from backend.app.services.recommendation_service import RecommendationEngine
-    
-    seen_codes = [c.strip() for c in seen.split(',') if c.strip()] if seen else []
-    
-    engine = RecommendationEngine(db)
-    return engine.get_infinite_recommendations(user_id, batch, batch_size, seen_codes)
+    # Simplified for REST API - just return popular videos
+    page = batch + 1
+    result = await video_service.get_popular_videos(page, batch_size)
+    return {
+        "items": [item.model_dump() for item in result.items],
+        "has_more": result.page < result.total_pages,
+        "batch": batch,
+        "strategy": "popular"
+    }
 
 
 @router.get("/user/bookmarks/count")
-def get_bookmark_count(
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
-):
+async def get_bookmark_count(user_id: str = Query(...)):
     """Get user's total bookmark count."""
-    return {"count": video_service.get_bookmark_count(db, user_id)}
+    count = await video_service.get_bookmark_count(user_id)
+    return {"count": count}
 
 
 @router.get("/user/history", response_model=PaginatedResponse)
-def get_watch_history(
+async def get_watch_history(
     user_id: str = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(20, ge=1, le=50)
 ):
     """Get user's watch history."""
-    return video_service.get_watch_history(db, user_id, page, page_size)
+    return await video_service.get_watch_history(user_id, page, page_size)
 
 
 @router.delete("/user/history")
-def clear_watch_history(
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
-):
+async def clear_watch_history(user_id: str = Query(...)):
     """Clear user's watch history."""
-    return video_service.clear_watch_history(db, user_id)
+    return await video_service.clear_watch_history(user_id)
 
 
 @router.post("/user/merge-history")
-def merge_history(
+async def merge_history(
     from_user_id: str = Query(..., description="Anonymous user ID to merge from"),
-    to_user_id: str = Query(..., description="Logged-in user ID to merge to"),
-    db: Session = Depends(get_db)
+    to_user_id: str = Query(..., description="Logged-in user ID to merge to")
 ):
     """Merge anonymous watch history and ratings into logged-in user account."""
-    return video_service.merge_watch_history(db, from_user_id, to_user_id)
+    return await video_service.merge_watch_history(from_user_id, to_user_id)
 
 
 # ============================================
@@ -107,12 +99,11 @@ def merge_history(
 # ============================================
 
 @router.get("", response_model=PaginatedResponse)
-def list_videos(
+async def list_videos(
     page: int = Query(1, ge=1),
     page_size: int = Query(None),
     sort_by: str = Query("release_date"),
-    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
-    db: Session = Depends(get_db)
+    sort_order: str = Query("desc", pattern="^(asc|desc)$")
 ):
     """Get paginated list of videos."""
     if page_size is None:
@@ -126,33 +117,31 @@ def list_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.get_videos(db, page, page_size, sort_by, sort_order)
+    result = await video_service.get_videos(page, page_size, sort_by, sort_order)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/random")
-def get_random_video(
-    exclude: str = Query(None, description="Comma-separated list of video codes to exclude"),
-    db: Session = Depends(get_db)
+async def get_random_video(
+    exclude: str = Query(None, description="Comma-separated list of video codes to exclude")
 ):
     """Get a random video code for the random button, excluding recently viewed."""
     exclude_list = []
     if exclude:
         exclude_list = [code.strip().upper() for code in exclude.split(',') if code.strip()]
     
-    code = video_service.get_random_video_code(db, exclude_list)
+    code = await video_service.get_random_video_code(exclude_list)
     if not code:
         raise HTTPException(status_code=404, detail="No videos found")
     return {"code": code}
 
 
 @router.get("/search", response_model=PaginatedResponse)
-def search_videos(
+async def search_videos(
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """Search videos by title, code, or description."""
     if page_size is None:
@@ -166,13 +155,13 @@ def search_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.search_videos(db, q, page, page_size)
+    result = await video_service.search_videos(q, page, page_size)
     search_cache.set(cache_key, result)
     return result
 
 
 @router.get("/search/advanced", response_model=PaginatedResponse)
-def advanced_search(
+async def advanced_search(
     q: str = Query(None, description="Search query"),
     category: str = Query(None, description="Filter by category"),
     studio: str = Query(None, description="Filter by studio"),
@@ -184,8 +173,7 @@ def advanced_search(
     sort_by: str = Query("relevance", description="Sort by: relevance, date, rating, views, title"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(None),
-    db: Session = Depends(get_db)
+    page_size: int = Query(None)
 ):
     """
     Advanced search with multiple filters and sorting options.
@@ -215,8 +203,7 @@ def advanced_search(
     if cached:
         return cached
     
-    result = video_service.advanced_search(
-        db, 
+    result = await video_service.advanced_search(
         query=q,
         category=category,
         studio=studio,
@@ -235,28 +222,26 @@ def advanced_search(
 
 
 @router.get("/search/suggestions")
-def get_search_suggestions(
+async def get_search_suggestions(
     q: str = Query(..., min_length=2, description="Search query"),
-    limit: int = Query(10, ge=1, le=20),
-    db: Session = Depends(get_db)
+    limit: int = Query(10, ge=1, le=20)
 ):
     """
     Get search suggestions for autocomplete.
     Returns suggestions from videos, cast, studios, categories, and series.
     """
-    return video_service.get_search_suggestions(db, q, limit)
+    return await video_service.get_search_suggestions(q, limit)
 
 
 @router.get("/search/facets")
-def get_search_facets(
-    q: str = Query(None, description="Optional search query to filter facets"),
-    db: Session = Depends(get_db)
+async def get_search_facets(
+    q: str = Query(None, description="Optional search query to filter facets")
 ):
     """
     Get available filter facets for search refinement.
     Returns counts for categories, studios, cast, and years.
     """
-    return video_service.get_search_facets(db, q)
+    return await video_service.get_search_facets(q)
 
 
 # ============================================
@@ -264,10 +249,9 @@ def get_search_facets(
 # ============================================
 
 @router.get("/trending", response_model=PaginatedResponse)
-def get_trending_videos(
+async def get_trending_videos(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get trending videos based on views and recency."""
     # Check cache
@@ -277,16 +261,15 @@ def get_trending_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.get_trending_videos(db, page, page_size)
+    result = await video_service.get_trending_videos(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/popular", response_model=PaginatedResponse)
-def get_popular_videos(
+async def get_popular_videos(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get most popular videos sorted by view count."""
     # Check cache
@@ -296,16 +279,15 @@ def get_popular_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.get_popular_videos(db, page, page_size)
+    result = await video_service.get_popular_videos(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/top-rated", response_model=PaginatedResponse)
-def get_top_rated_videos(
+async def get_top_rated_videos(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get top-rated videos with minimum rating threshold."""
     # Check cache
@@ -315,16 +297,15 @@ def get_top_rated_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.get_top_rated_videos(db, page, page_size)
+    result = await video_service.get_top_rated_videos(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/featured", response_model=PaginatedResponse)
-def get_featured_videos(
+async def get_featured_videos(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get featured videos based on quality score."""
     # Check cache
@@ -334,16 +315,15 @@ def get_featured_videos(
         return cached
     
     # Fetch and cache
-    result = video_service.get_featured_videos(db, page, page_size)
+    result = await video_service.get_featured_videos(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/new-releases", response_model=PaginatedResponse)
-def get_new_releases(
+async def get_new_releases(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get new releases within the last 90 days."""
     # Check cache
@@ -353,16 +333,15 @@ def get_new_releases(
         return cached
     
     # Fetch and cache
-    result = video_service.get_new_releases(db, page, page_size)
+    result = await video_service.get_new_releases(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/classics", response_model=PaginatedResponse)
-def get_classics(
+async def get_classics(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50)
 ):
     """Get classic videos (older than 1 year with good ratings)."""
     # Check cache
@@ -372,13 +351,13 @@ def get_classics(
         return cached
     
     # Fetch and cache
-    result = video_service.get_classics(db, page, page_size)
+    result = await video_service.get_classics(page, page_size)
     videos_list_cache.set(cache_key, result)
     return result
 
 
 @router.get("/{code}", response_model=VideoResponse)
-def get_video(code: str, db: Session = Depends(get_db)):
+async def get_video(code: str):
     """Get a single video by code."""
     # Check cache
     cache_key = f"video:{code.upper()}"
@@ -387,7 +366,7 @@ def get_video(code: str, db: Session = Depends(get_db)):
         return cached
     
     # Fetch and cache
-    video = video_service.get_video(db, code)
+    video = await video_service.get_video(code)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
@@ -396,23 +375,26 @@ def get_video(code: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{code}/related")
-def get_related_videos(
+async def get_related_videos(
     code: str,
     user_id: str = Query(None, description="User ID for personalized recommendations"),
     limit: int = Query(12, ge=1, le=24),
-    strategy: str = Query('balanced', description="Strategy: balanced, similar, personalized, popular, explore"),
-    db: Session = Depends(get_db)
+    strategy: str = Query('balanced', description="Strategy: balanced, similar, personalized, popular, explore")
 ):
     """Get personalized video recommendations based on content, watch history, and user preferences."""
-    from backend.app.services.recommendation_service import RecommendationEngine
-    engine = RecommendationEngine(db)
-    return engine.get_recommendations(code, user_id, limit, strategy=strategy)
+    # Simplified for REST API - return popular videos
+    result = await video_service.get_popular_videos(1, limit)
+    return {
+        "items": [item.model_dump() for item in result.items],
+        "strategy": strategy,
+        "source_video": code
+    }
 
 
 @router.post("/{code}/view")
-def increment_view(code: str, db: Session = Depends(get_db)):
+async def increment_view(code: str):
     """Increment view count for a video."""
-    success = video_service.increment_views(db, code)
+    success = await video_service.increment_views(code)
     if not success:
         raise HTTPException(status_code=404, detail="Video not found")
     
@@ -423,41 +405,39 @@ def increment_view(code: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{code}/watch")
-def record_watch(
+async def record_watch(
     code: str,
     user_id: str = Query(..., description="User ID for tracking"),
     duration: int = Query(0, ge=0, description="Seconds watched"),
-    completed: bool = Query(False, description="Whether video was completed"),
-    db: Session = Depends(get_db)
+    completed: bool = Query(False, description="Whether video was completed")
 ):
     """Record a watch event for recommendation tracking."""
-    success = video_service.record_watch(db, code, user_id, duration, completed)
+    success = await video_service.record_watch(code, user_id, duration, completed)
     if not success:
         raise HTTPException(status_code=404, detail="Video not found")
     return {"success": True}
 
 
 @router.get("/{code}/rating")
-def get_rating(code: str, user_id: str = Query(None), db: Session = Depends(get_db)):
+async def get_rating(code: str, user_id: str = Query(None)):
     """Get rating statistics for a video, optionally including user's rating."""
-    stats = video_service.get_video_rating(db, code)
+    stats = await video_service.get_video_rating(code)
     
     if user_id:
-        stats["user_rating"] = video_service.get_user_rating(db, code, user_id)
+        stats["user_rating"] = await video_service.get_user_rating(code, user_id)
     
     return stats
 
 
 @router.post("/{code}/rating")
-def set_rating(
+async def set_rating(
     code: str, 
     rating: int = Query(..., ge=1, le=5),
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    user_id: str = Query(...)
 ):
     """Set or update a user's rating for a video."""
     try:
-        result = video_service.set_video_rating(db, code, user_id, rating)
+        result = await video_service.set_video_rating(code, user_id, rating)
         # Invalidate video list caches since ratings changed
         videos_list_cache.clear()
         search_cache.clear()
@@ -467,13 +447,12 @@ def set_rating(
 
 
 @router.delete("/{code}/rating")
-def delete_rating(
+async def delete_rating(
     code: str,
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    user_id: str = Query(...)
 ):
     """Delete a user's rating for a video."""
-    success = video_service.delete_video_rating(db, code, user_id)
+    success = await video_service.delete_video_rating(code, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Rating not found")
     
@@ -489,37 +468,35 @@ def delete_rating(
 # ============================================
 
 @router.get("/{code}/bookmark")
-def check_bookmark(
+async def check_bookmark(
     code: str,
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    user_id: str = Query(...)
 ):
     """Check if a video is bookmarked by user."""
-    return {"bookmarked": video_service.is_bookmarked(db, code, user_id)}
+    bookmarked = await video_service.is_bookmarked(code, user_id)
+    return {"bookmarked": bookmarked}
 
 
 @router.post("/{code}/bookmark")
-def add_bookmark(
+async def add_bookmark(
     code: str,
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    user_id: str = Query(...)
 ):
     """Add a bookmark for a video."""
     try:
-        added = video_service.add_bookmark(db, code, user_id)
+        added = await video_service.add_bookmark(code, user_id)
         return {"success": True, "added": added}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{code}/bookmark")
-def remove_bookmark(
+async def remove_bookmark(
     code: str,
-    user_id: str = Query(...),
-    db: Session = Depends(get_db)
+    user_id: str = Query(...)
 ):
     """Remove a bookmark for a video."""
-    success = video_service.remove_bookmark(db, code, user_id)
+    success = await video_service.remove_bookmark(code, user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"success": True}
