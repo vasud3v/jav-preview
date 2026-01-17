@@ -77,3 +77,6 @@ debug_*.html
 supabase-cli.tar.gz
 supabase.exe
 downloaded_files/
+
+# Local Netlify folder
+.netlify

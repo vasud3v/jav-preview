@@ -776,11 +776,25 @@ async def get_all_categories() -> List[dict]:
     """Get all categories with video counts."""
     client = get_supabase_rest()
     
+    # Get all categories
     categories = await client.get('categories', select='id,name')
+    if not categories:
+        return []
     
+    # Get all video_categories entries to count locally (faster than N queries)
+    video_categories = await client.get('video_categories', select='category_id')
+    
+    # Count videos per category
+    cat_counts = {}
+    for vc in video_categories or []:
+        cat_id = vc.get('category_id')
+        if cat_id:
+            cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
+    
+    # Build result
     result = []
     for cat in categories:
-        count = await client.count('video_categories', filters={'category_id': f'eq.{cat["id"]}'})
+        count = cat_counts.get(cat['id'], 0)
         result.append({'name': cat['name'], 'count': count})
     
     result.sort(key=lambda x: x['count'], reverse=True)
@@ -810,11 +824,25 @@ async def get_all_cast() -> List[dict]:
     """Get all cast members with video counts."""
     client = get_supabase_rest()
     
+    # Get all cast members
     cast_members = await client.get('cast_members', select='id,name')
+    if not cast_members:
+        return []
     
+    # Get all video_cast entries to count locally (faster than N queries)
+    video_cast = await client.get('video_cast', select='cast_id')
+    
+    # Count videos per cast member
+    cast_counts = {}
+    for vc in video_cast or []:
+        cast_id = vc.get('cast_id')
+        if cast_id:
+            cast_counts[cast_id] = cast_counts.get(cast_id, 0) + 1
+    
+    # Build result
     result = []
     for cm in cast_members:
-        count = await client.count('video_cast', filters={'cast_id': f'eq.{cm["id"]}'})
+        count = cast_counts.get(cm['id'], 0)
         if count > 0:
             result.append({'name': cm['name'], 'count': count})
     

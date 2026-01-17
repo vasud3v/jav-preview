@@ -5,7 +5,7 @@ import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
 
 // Graceful shutdown handling
-window.addEventListener('beforeunload', (event) => {
+window.addEventListener('beforeunload', () => {
   // Cleanup any pending requests, close connections, etc.
   console.log('Application shutting down gracefully...')
   
