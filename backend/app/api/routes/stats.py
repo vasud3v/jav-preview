@@ -28,10 +28,13 @@ async def get_stats():
     studios = set(v.get("studio") for v in videos if v.get("studio"))
     
     result = {
-        "video_count": video_count,
-        "category_count": category_count,
+        "total_videos": video_count,
+        "categories_count": category_count,
         "cast_count": cast_count,
-        "studio_count": len(studios)
+        "studios_count": len(studios),
+        "oldest_video": None,
+        "newest_video": None,
+        "database_size_bytes": 0
     }
     
     stats_cache.set("stats", result)
