@@ -1,5 +1,6 @@
 """Application configuration."""
 from pathlib import Path
+from typing import Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +8,7 @@ class Settings(BaseSettings):
     """Application settings."""
     
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).parent.parent.parent.parent / "backend" / ".env",
+        env_file=Path(__file__).parent.parent.parent / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -27,15 +28,15 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
-    # CORS
-    cors_origins: list[str] = ["https://jav-preview.netlify.app", "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]
+    # CORS - accepts comma-separated string from env
+    cors_origins: str = "https://jav-preview.netlify.app,http://localhost:5173,http://localhost:3000"
     
     @property
     def cors_origins_list(self) -> list[str]:
-        """Return CORS origins as a list, handling string input from env."""
-        if isinstance(self.cors_origins, str):
-            return [origin.strip() for origin in self.cors_origins.split(",")]
-        return self.cors_origins
+        """Return CORS origins as a list."""
+        if not self.cors_origins:
+            return ["http://localhost:5173", "http://localhost:3000"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
     
     # Pagination
     default_page_size: int = 20
