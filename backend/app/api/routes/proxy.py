@@ -5,7 +5,7 @@ import httpx
 from urllib.parse import unquote, quote
 import hashlib
 
-from backend.app.core.cache import playlist_cache, segment_cache, image_cache
+from app.core.cache import playlist_cache, segment_cache, image_cache
 
 router = APIRouter(prefix="/proxy", tags=["proxy"])
 

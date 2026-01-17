@@ -1,8 +1,8 @@
 """Auth routes using Supabase."""
 from fastapi import APIRouter, HTTPException, Depends
-from backend.app.core.supabase import get_supabase
-from backend.app.core.auth import require_auth, get_current_user
-from backend.app.schemas.auth import (
+from app.core.supabase import get_supabase
+from app.core.auth import require_auth, get_current_user
+from app.schemas.auth import (
     SignUpRequest, SignInRequest, AuthResponse, UserResponse, RefreshRequest,
     ForgotPasswordRequest, ResetPasswordRequest, UpdatePasswordRequest,
     UpdateProfileRequest, MessageResponse
@@ -243,7 +243,7 @@ async def update_profile(request: UpdateProfileRequest, user: dict = Depends(req
 async def delete_account(user: dict = Depends(require_auth)):
     """Delete user account."""
     try:
-        from backend.app.core.supabase import get_supabase_admin
+        from app.core.supabase import get_supabase_admin
         admin = get_supabase_admin()
         admin.auth.admin.delete_user(user["id"])
         return MessageResponse(message="Account deleted successfully")

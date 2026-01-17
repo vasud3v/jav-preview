@@ -5,9 +5,9 @@ from typing import List, Optional, Tuple
 from sqlalchemy import func, desc, asc, case, and_, or_
 from sqlalchemy.orm import Session
 
-from backend.app.models import Video, Category, CastMember, VideoRating, VideoBookmark, WatchHistory
+from app.models import Video, Category, CastMember, VideoRating, VideoBookmark, WatchHistory
 from scraper.db_models import video_categories, video_cast
-from backend.app.schemas import VideoListItem, VideoResponse, PaginatedResponse
+from app.schemas import VideoListItem, VideoResponse, PaginatedResponse
 
 
 def _video_to_list_item(video: Video, rating_info: dict = None) -> dict:

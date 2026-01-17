@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from backend.app.core.supabase_rest_client import get_supabase_rest
+from app.core.supabase_rest_client import get_supabase_rest
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 

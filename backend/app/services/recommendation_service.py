@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 from sqlalchemy import func, desc, asc, and_, or_
 from sqlalchemy.orm import Session
 
-from backend.app.models import Video, Category, CastMember, VideoRating, VideoBookmark, WatchHistory
+from app.models import Video, Category, CastMember, VideoRating, VideoBookmark, WatchHistory
 from scraper.db_models import video_categories, video_cast
 
 

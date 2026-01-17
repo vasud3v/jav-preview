@@ -4,9 +4,9 @@ import json
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
-from backend.app.models import Video, Category, CastMember
-from backend.app.schemas import StatsResponse, CategoryResponse, CastResponse, StudioResponse
-from backend.app.schemas.metadata import CastWithImageResponse
+from app.models import Video, Category, CastMember
+from app.schemas import StatsResponse, CategoryResponse, CastResponse, StudioResponse
+from app.schemas.metadata import CastWithImageResponse
 
 
 def get_stats(db: Session) -> StatsResponse:

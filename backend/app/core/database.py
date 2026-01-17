@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker, Session
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from scraper.db_models import Base
-from backend.app.core.config import settings
+from app.core.config import settings
 
 # Use Supabase PostgreSQL connection
 if not settings.supabase_db_url:

@@ -1,8 +1,8 @@
 """File upload routes."""
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from backend.app.core.supabase import get_supabase, get_supabase_admin
-from backend.app.core.config import settings
-from backend.app.core.auth import require_auth
+from app.core.supabase import get_supabase, get_supabase_admin
+from app.core.config import settings
+from app.core.auth import require_auth
 import uuid
 
 router = APIRouter(prefix="/upload", tags=["upload"])

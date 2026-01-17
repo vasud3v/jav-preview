@@ -5,8 +5,8 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 import math
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from backend.app.core.supabase_rest_client import get_supabase_rest
-from backend.app.schemas import VideoListItem, VideoResponse, PaginatedResponse
+from app.core.supabase_rest_client import get_supabase_rest
+from app.schemas import VideoListItem, VideoResponse, PaginatedResponse
 
 
 async def _video_to_list_item(video: dict, rating_info: dict = None) -> dict:

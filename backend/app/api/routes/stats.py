@@ -1,9 +1,9 @@
 """Stats routes using Supabase REST API."""
 from fastapi import APIRouter
 
-from backend.app.schemas import StatsResponse
-from backend.app.core.supabase_rest_client import get_supabase_rest
-from backend.app.core.cache import stats_cache, get_all_cache_stats, clear_all_caches
+from app.schemas import StatsResponse
+from app.core.supabase_rest_client import get_supabase_rest
+from app.core.cache import stats_cache, get_all_cache_stats, clear_all_caches
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 

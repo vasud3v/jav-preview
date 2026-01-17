@@ -1,10 +1,10 @@
 """Video routes using Supabase REST API."""
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.app.core.config import settings
-from backend.app.schemas import VideoResponse, PaginatedResponse
-from backend.app.services import video_service_rest as video_service
-from backend.app.core.cache import (
+from app.core.config import settings
+from app.schemas import VideoResponse, PaginatedResponse
+from app.services import video_service_rest as video_service
+from app.core.cache import (
     videos_list_cache, video_detail_cache, search_cache, generate_cache_key
 )
 

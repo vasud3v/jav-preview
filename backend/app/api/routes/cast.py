@@ -1,11 +1,11 @@
 """Cast routes using Supabase REST API."""
 from fastapi import APIRouter, Query
 
-from backend.app.core.config import settings
-from backend.app.schemas import CastResponse, PaginatedResponse
-from backend.app.schemas.metadata import CastWithImageResponse
-from backend.app.services import video_service_rest as video_service
-from backend.app.core.cache import cast_cache, cast_featured_cache, cast_videos_cache, generate_cache_key
+from app.core.config import settings
+from app.schemas import CastResponse, PaginatedResponse
+from app.schemas.metadata import CastWithImageResponse
+from app.services import video_service_rest as video_service
+from app.core.cache import cast_cache, cast_featured_cache, cast_videos_cache, generate_cache_key
 
 router = APIRouter(prefix="/cast", tags=["cast"])
 

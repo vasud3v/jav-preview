@@ -2,7 +2,7 @@
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from backend.app.core.supabase import get_supabase
+from app.core.supabase import get_supabase
 
 security = HTTPBearer(auto_error=False)
 

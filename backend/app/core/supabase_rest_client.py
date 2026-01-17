@@ -5,7 +5,7 @@ Uses httpx for async HTTP requests to Supabase REST API.
 import os
 from typing import Optional, List, Dict, Any, Tuple
 import httpx
-from backend.app.core.config import settings
+from app.core.config import settings
 
 
 class SupabaseRestClient:

@@ -1,6 +1,6 @@
 """Supabase client for authentication."""
 from supabase import create_client, Client
-from backend.app.core.config import settings
+from app.core.config import settings
 
 _supabase: Client | None = None
 

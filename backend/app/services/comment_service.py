@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
-from backend.app.models import Comment, CommentVote, Video
+from app.models import Comment, CommentVote, Video
 
 
 def get_comments(
