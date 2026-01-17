@@ -791,13 +791,12 @@ async def get_all_categories() -> List[dict]:
         if cat_id:
             cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
     
-    # Build result
     result = []
     for cat in categories:
-        count = cat_counts.get(cat['id'], 0)
-        result.append({'name': cat['name'], 'count': count})
+        video_count = cat_counts.get(cat['id'], 0)
+        result.append({'name': cat['name'], 'video_count': video_count})
     
-    result.sort(key=lambda x: x['count'], reverse=True)
+    result.sort(key=lambda x: x['video_count'], reverse=True)
     return result
 
 
@@ -815,8 +814,8 @@ async def get_all_studios() -> List[dict]:
         if studio:
             studio_counts[studio] = studio_counts.get(studio, 0) + 1
     
-    result = [{'name': name, 'count': count} for name, count in studio_counts.items()]
-    result.sort(key=lambda x: x['count'], reverse=True)
+    result = [{'name': name, 'video_count': count} for name, count in studio_counts.items()]
+    result.sort(key=lambda x: x['video_count'], reverse=True)
     return result
 
 
@@ -842,11 +841,11 @@ async def get_all_cast() -> List[dict]:
     # Build result
     result = []
     for cm in cast_members:
-        count = cast_counts.get(cm['id'], 0)
-        if count > 0:
-            result.append({'name': cm['name'], 'count': count})
+        video_count = cast_counts.get(cm['id'], 0)
+        if video_count > 0:
+            result.append({'name': cm['name'], 'video_count': video_count})
     
-    result.sort(key=lambda x: x['count'], reverse=True)
+    result.sort(key=lambda x: x['video_count'], reverse=True)
     return result[:100]  # Limit to top 100
 
 
@@ -862,9 +861,56 @@ async def get_all_series() -> List[dict]:
         if series:
             series_counts[series] = series_counts.get(series, 0) + 1
     
-    result = [{'name': name, 'count': count} for name, count in series_counts.items()]
-    result.sort(key=lambda x: x['count'], reverse=True)
+    result = [{'name': name, 'video_count': count} for name, count in series_counts.items()]
+    result.sort(key=lambda x: x['video_count'], reverse=True)
     return result
+
+
+async def get_cast_with_images(limit: int = 100) -> List[dict]:
+    """Get cast members with their images from videos' cast_images field."""
+    client = get_supabase_rest()
+    
+    # Get all cast members with counts
+    cast_members = await client.get('cast_members', select='id,name')
+    if not cast_members:
+        return []
+    
+    # Get all video_cast entries to count locally
+    video_cast = await client.get('video_cast', select='cast_id')
+    
+    # Count videos per cast member
+    cast_counts = {}
+    for vc in video_cast or []:
+        cast_id = vc.get('cast_id')
+        if cast_id:
+            cast_counts[cast_id] = cast_counts.get(cast_id, 0) + 1
+    
+    # Get videos with cast_images to find images
+    videos = await client.get('videos', select='cast_images')
+    
+    # Build a map of cast name -> image URL
+    cast_images = {}
+    for v in videos or []:
+        video_cast_images = v.get('cast_images') or {}
+        if isinstance(video_cast_images, dict):
+            for name, url in video_cast_images.items():
+                if name and url and name not in cast_images:
+                    cast_images[name] = url
+    
+    # Build result with images
+    result = []
+    for cm in cast_members:
+        video_count = cast_counts.get(cm['id'], 0)
+        if video_count > 0:
+            image_url = cast_images.get(cm['name'], '')
+            result.append({
+                'name': cm['name'],
+                'video_count': video_count,
+                'image_url': image_url
+            })
+    
+    result.sort(key=lambda x: x['video_count'], reverse=True)
+    return result[:limit]
 
 
 async def get_search_suggestions(query: str, limit: int = 10) -> dict:

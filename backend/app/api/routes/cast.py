@@ -31,12 +31,10 @@ async def list_all_cast_with_images():
     if cached:
         return cached
     
-    # For REST API, cast images are fetched separately
-    result = await video_service.get_all_cast()
-    # Add empty image_url for now - images are stored per video
-    result_with_images = [{"name": c["name"], "video_count": c["count"], "image_url": ""} for c in result]
-    cast_cache.set("all_cast_images", result_with_images)
-    return result_with_images
+    # Use get_cast_with_images to fetch cast with images from videos
+    result = await video_service.get_cast_with_images(100)
+    cast_cache.set("all_cast_images", result)
+    return result
 
 
 @router.get("/featured", response_model=list[CastWithImageResponse])
@@ -50,12 +48,10 @@ async def get_featured_cast(
     if cached:
         return cached
     
-    # Fetch and cache
-    result = await video_service.get_all_cast()
-    result = result[:limit]
-    result_with_images = [{"name": c["name"], "video_count": c["count"], "image_url": ""} for c in result]
-    cast_featured_cache.set(cache_key, result_with_images)
-    return result_with_images
+    # Use get_cast_with_images to fetch cast with images from videos
+    result = await video_service.get_cast_with_images(limit)
+    cast_featured_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/{cast_name}/videos", response_model=PaginatedResponse)
