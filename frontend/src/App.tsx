@@ -30,7 +30,7 @@ function App() {
           <ScrollLine />
           <RandomButton />
           <BackButton />
-          <main className="pt-20 xl:pl-12">
+          <main className="pt-20 pl-12">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/settings" element={<Settings />} />
