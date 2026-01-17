@@ -7,8 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.supabase_rest_client import get_supabase_rest, close_supabase_rest
-from app.api.router import api_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -25,6 +23,19 @@ app.add_middleware(
 )
 
 
+# Simple health check before any complex imports
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "version": settings.api_version}
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": "Prevue API", "version": settings.api_version}
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler to log all errors."""
@@ -37,7 +48,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-app.include_router(api_router)
+# Import and include router AFTER health check is registered
+try:
+    from app.core.supabase_rest_client import get_supabase_rest, close_supabase_rest
+    from app.api.router import api_router
+    app.include_router(api_router)
+    _router_loaded = True
+except Exception as e:
+    print(f"ERROR loading router: {e}")
+    traceback.print_exc()
+    _router_loaded = False
+    close_supabase_rest = None
 
 
 @app.on_event("startup")
@@ -46,39 +67,35 @@ async def startup_event():
     print("=" * 60)
     print(f"{settings.app_name} v{settings.api_version}")
     print("=" * 60)
+    print(f"✓ CORS origins: {settings.cors_origins_list}")
+    print(f"✓ Router loaded: {_router_loaded}")
     
     # Initialize Supabase REST client
-    try:
-        client = get_supabase_rest()
-        print(f"✓ Connected to Supabase REST API")
-    except Exception as e:
-        print(f"⚠ Supabase connection warning: {e}")
+    if _router_loaded:
+        try:
+            client = get_supabase_rest()
+            print(f"✓ Connected to Supabase REST API")
+        except Exception as e:
+            print(f"⚠ Supabase connection warning: {e}")
     
-    print(f"✓ CORS origins: {settings.cors_origins_list}")
-    print(f"✓ API running on http://{settings.host}:{settings.port}")
-    print(f"✓ Press Ctrl+C to stop gracefully")
+    print(f"✓ API ready on http://0.0.0.0:{settings.port}")
     print("=" * 60)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Run on application shutdown."""
-    print("\n" + "=" * 60)
-    print("SHUTTING DOWN GRACEFULLY")
-    print("=" * 60)
-    print("✓ Closing Supabase REST client...")
-    await close_supabase_rest()
-    print("✓ Backend stopped successfully")
-    print("=" * 60)
+    print("\nShutting down...")
+    if close_supabase_rest:
+        await close_supabase_rest()
+    print("✓ Stopped")
 
 
 def signal_handler(signum, frame):
     """Handle shutdown signals."""
-    print("\n\nReceived shutdown signal...")
     sys.exit(0)
 
 
-# Register signal handlers
 signal.signal(signal.SIGINT, signal_handler)
 if hasattr(signal, 'SIGTERM'):
     signal.signal(signal.SIGTERM, signal_handler)
