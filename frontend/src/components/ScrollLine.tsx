@@ -39,7 +39,7 @@ export default function ScrollLine() {
     <div
       ref={lineRef}
       onClick={handleLineClick}
-      className="fixed left-2 top-24 bottom-24 z-40 w-5 cursor-pointer group hidden lg:flex items-center justify-center"
+      className="fixed left-1 top-24 bottom-24 z-40 w-4 cursor-pointer group hidden xl:flex items-center justify-center"
     >
       {/* Track background */}
       <div
