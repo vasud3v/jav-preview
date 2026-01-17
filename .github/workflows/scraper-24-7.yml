@@ -3,7 +3,7 @@ name: Scraper 24/7 Random Mode
 on:
   # Run every hour, 24/7
   schedule:
-    - cron: '0 * * * *'  # Every hour at minute 0
+    - cron: '0 */4 * * *'  # Every 4 hours
   
   # Allow manual trigger to start immediately
   workflow_dispatch:
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   scrape-random:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 hours max per run
+    timeout-minutes: 260  # 4h 20m max per run (safety buffer)
     
     steps:
       - name: Checkout code
@@ -181,18 +181,38 @@ jobs:
           cd scraper
           
           echo "============================================================"
-          echo "SCRAPER 24/7 - RANDOM MODE"
+          echo "SCRAPER 24/7 - RANDOM MODE (4-HOUR PARTITIONS)"
           echo "============================================================"
           echo "Started:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Duration:  55 minutes"
-          echo "Mode:      Random"
+          echo "Duration:  ~4 hours (4 cycles of 50m run + 10m break)"
           echo "Run #:     ${{ github.run_number }}"
           echo "============================================================"
           echo ""
           
-          # Run for 55 minutes (leave 5 min buffer for cleanup)
-          # Use timeout with SIGTERM first, then SIGKILL after 2 min
-          timeout -s TERM -k 120 55m python main.py --headless || EXIT_CODE=$?
+          # Loop 4 times (4 hours total)
+          for i in {1..4}; do
+            echo ""
+            echo "============================================================"
+            echo "CYCLE $i/4 - Started: $(date -u '+%H:%M:%S UTC')"
+            echo "============================================================"
+            
+            # Run for 50 minutes
+            timeout -s TERM -k 120 50m python main.py --headless --debug || echo "Cycle $i finished or timed out"
+            
+            # Take break if not the last cycle
+            if [ $i -lt 4 ]; then
+              echo ""
+              echo "Taking 10 minute break..."
+              
+              # Force kill browser to prevent memory leaks
+              pkill -f chrome || true
+              pkill -f chromedriver || true
+              
+              sleep 600
+            fi
+          done
+          
+          EXIT_CODE=0
           
           # Cleanup Xvfb
           if [ -n "$XVFB_PID" ]; then
