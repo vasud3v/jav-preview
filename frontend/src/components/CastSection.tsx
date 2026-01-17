@@ -13,13 +13,13 @@ interface CastSectionProps {
   onCastClick?: (name: string) => void;
 }
 
-export default function CastSection({ 
-  title, 
+export default function CastSection({
+  title,
   icon,
-  cast, 
-  loading, 
+  cast,
+  loading,
   onSeeAll,
-  onCastClick 
+  onCastClick
 }: CastSectionProps) {
   const { color } = useNeonColor();
   if (loading) {
@@ -46,7 +46,7 @@ export default function CastSection({
           <h2 className="text-base font-semibold text-white">{title}</h2>
         </div>
         {onSeeAll && (
-          <button 
+          <button
             onClick={onSeeAll}
             className="flex items-center gap-1 text-xs transition-colors cursor-pointer"
             style={{ color: color.hex }}
@@ -60,15 +60,15 @@ export default function CastSection({
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {cast.map((member) => (
-          <div 
-            key={member.name} 
+          <div
+            key={member.name}
             className="flex-shrink-0 flex flex-col items-center gap-2 cursor-pointer group"
             onClick={() => onCastClick?.(member.name)}
           >
             <div className="relative">
-              <div 
-                className="w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 transition-all duration-300"
-                style={{ }}
+              <div
+                className="w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-white/10 transition-all duration-300"
+                style={{}}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = `rgba(${color.rgb}, 0.5)`;
                   e.currentTarget.style.boxShadow = `0 10px 15px -3px rgba(${color.rgb}, 0.2)`;
@@ -91,15 +91,15 @@ export default function CastSection({
                   </div>
                 )}
               </div>
-              <div 
-                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+              <div
+                className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{ background: `linear-gradient(to top, rgba(${color.rgb}, 0.2), transparent)` }}
               />
             </div>
             <div className="text-center">
-              <p 
-                className="text-xs text-white/80 transition-colors truncate max-w-[80px]"
-                style={{ }}
+              <p
+                className="text-[10px] sm:text-xs text-white/80 transition-colors truncate max-w-[64px] sm:max-w-[72px] md:max-w-[80px]"
+                style={{}}
                 onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
                 onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
               >
