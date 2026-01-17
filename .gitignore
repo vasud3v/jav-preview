@@ -1,0 +1,79 @@
+# Environment files
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Deprecated - No longer used (everything in Supabase now)
+database/*.db
+database/*.db-journal
+database/videos/
+database/indexes/
+scraper_state/*.json
+scraper_state/*.db
+scraper_state/*.db-journal
+
+# Supabase
+.supabase/
+supabase/.temp/
+
+# Node
+node_modules/
+.npm
+frontend/dist/
+frontend/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Downloaded files
+scraper/downloaded_files/
+
+# Debug files
+*.html
+debug_*.html
+
+# Supabase CLI
+supabase-cli.tar.gz
+supabase.exe
+downloaded_files/

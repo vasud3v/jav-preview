@@ -1,0 +1,366 @@
+name: Scraper 24/7 Random Mode
+
+on:
+  # Run every hour, 24/7
+  schedule:
+    - cron: '0 * * * *'  # Every hour at minute 0
+  
+  # Allow manual trigger to start immediately
+  workflow_dispatch:
+
+# Prevent multiple instances running simultaneously
+concurrency:
+  group: scraper-24-7
+  cancel-in-progress: false  # Let current run finish
+
+jobs:
+  scrape-random:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max per run
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scraper/requirements.txt
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          
+          # Remove snap chromium if installed
+          sudo snap remove chromium 2>/dev/null || true
+          
+          # Install Chrome from Google's repository (not snap)
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable xvfb
+          
+          # Verify Chrome installation
+          google-chrome --version
+          which google-chrome
+      
+      - name: Install Python dependencies
+        id: install-deps
+        run: |
+          pip install --upgrade pip
+          pip install requests  # Ensure requests is available for verification steps
+          pip install -r scraper/requirements.txt
+      
+      - name: Verify Supabase connection
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python -c "
+          import os
+          import requests
+          import sys
+          
+          supabase_url = os.getenv('SUPABASE_URL')
+          supabase_key = os.getenv('SUPABASE_KEY')
+          
+          if not supabase_url or not supabase_key:
+              print('❌ SUPABASE_URL or SUPABASE_KEY not set')
+              sys.exit(1)
+          
+          try:
+              # Use REST API to count videos
+              headers = {
+                  'apikey': supabase_key,
+                  'Authorization': f'Bearer {supabase_key}',
+                  'Prefer': 'count=exact'
+              }
+              response = requests.get(
+                  f'{supabase_url}/rest/v1/videos',
+                  headers=headers,
+                  params={'select': 'code', 'limit': 0},
+                  timeout=10
+              )
+              
+              if response.status_code in (200, 206):
+                  content_range = response.headers.get('Content-Range', '0-0/0')
+                  try:
+                      count = content_range.split('/')[-1] if '/' in content_range else '0'
+                  except (AttributeError, IndexError):
+                      count = '0'
+                  print(f'✅ Connected to Supabase: {count} videos in database')
+              else:
+                  print(f'❌ Connection failed: HTTP {response.status_code}')
+                  print(f'Response: {response.text[:200]}')
+                  sys.exit(1)
+          except requests.exceptions.RequestException as e:
+              print(f'❌ Connection failed: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print(f'❌ Unexpected error: {e}')
+              sys.exit(1)
+          "
+      
+      - name: Check Supabase rate limits
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python -c "
+          import os
+          import requests
+          from datetime import datetime, timedelta, timezone
+          
+          supabase_url = os.getenv('SUPABASE_URL')
+          supabase_key = os.getenv('SUPABASE_KEY')
+          
+          headers = {
+              'apikey': supabase_key,
+              'Authorization': f'Bearer {supabase_key}',
+              'Prefer': 'count=exact'
+          }
+          
+          # Check recent activity (last hour) - use timezone-aware datetime
+          one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+          try:
+              response_hour = requests.get(
+                  f'{supabase_url}/rest/v1/videos',
+                  headers=headers,
+                  params={'select': 'code', 'scraped_at': f'gte.{one_hour_ago}', 'limit': 0},
+                  timeout=10
+              )
+              if response_hour.status_code in (200, 206):
+                  content_range = response_hour.headers.get('Content-Range', '0-0/0')
+                  recent_hour = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  recent_hour = '0'
+          except Exception:
+              recent_hour = '0'
+          
+          # Check recent activity (last 24 hours)
+          one_day_ago = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+          try:
+              response_day = requests.get(
+                  f'{supabase_url}/rest/v1/videos',
+                  headers=headers,
+                  params={'select': 'code', 'scraped_at': f'gte.{one_day_ago}', 'limit': 0},
+                  timeout=10
+              )
+              if response_day.status_code in (200, 206):
+                  content_range = response_day.headers.get('Content-Range', '0-0/0')
+                  recent_day = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  recent_day = '0'
+          except Exception:
+              recent_day = '0'
+          
+          print(f'Recent activity: {recent_hour} videos/hour, {recent_day} videos/day')
+          
+          # Warn if too many videos (potential rate limit issue)
+          try:
+              if int(recent_hour) > 1000:
+                  print('⚠️  High activity detected - may hit rate limits')
+          except (ValueError, TypeError):
+              print(f'⚠️  Could not parse activity count: {recent_hour}')
+          "
+      
+      - name: Run scraper in random mode (55 minutes)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          DISPLAY: ':99'
+        run: |
+          # Start virtual display and save PID
+          Xvfb :99 -screen 0 1920x1080x24 &
+          XVFB_PID=$!
+          echo "Xvfb started with PID: $XVFB_PID"
+          sleep 2
+          
+          cd scraper
+          
+          echo "============================================================"
+          echo "SCRAPER 24/7 - RANDOM MODE"
+          echo "============================================================"
+          echo "Started:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Duration:  55 minutes"
+          echo "Mode:      Random"
+          echo "Run #:     ${{ github.run_number }}"
+          echo "============================================================"
+          echo ""
+          
+          # Run for 55 minutes (leave 5 min buffer for cleanup)
+          # Use timeout with SIGTERM first, then SIGKILL after 2 min
+          timeout -s TERM -k 120 55m python main.py --headless || EXIT_CODE=$?
+          
+          # Cleanup Xvfb
+          if [ -n "$XVFB_PID" ]; then
+              kill -9 $XVFB_PID 2>/dev/null || true
+          fi
+          
+          echo ""
+          echo "============================================================"
+          if [ "${EXIT_CODE:-0}" -eq 124 ]; then
+            echo "✅ Scraper completed: Time limit reached (55 minutes)"
+            exit 0
+          elif [ "${EXIT_CODE:-0}" -eq 0 ]; then
+            echo "✅ Scraper completed successfully"
+            exit 0
+          elif [ "${EXIT_CODE:-0}" -eq 137 ]; then
+            echo "⚠️  Scraper killed (SIGKILL) - may have hung"
+            exit 0  # Don't fail the workflow
+          else
+            echo "⚠️  Scraper stopped with exit code: ${EXIT_CODE}"
+            exit 0  # Don't fail the workflow - let next run try
+          fi
+      
+      - name: Get statistics
+        if: always() && steps.install-deps.outcome == 'success'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python -c "
+          import os
+          import requests
+          from datetime import datetime, timedelta, timezone
+          import sys
+          
+          supabase_url = os.getenv('SUPABASE_URL')
+          supabase_key = os.getenv('SUPABASE_KEY')
+          
+          try:
+              headers = {
+                  'apikey': supabase_key,
+                  'Authorization': f'Bearer {supabase_key}',
+                  'Prefer': 'count=exact'
+              }
+              
+              # Total videos
+              response_total = requests.get(
+                  f'{supabase_url}/rest/v1/videos',
+                  headers=headers,
+                  params={'select': 'code', 'limit': 0},
+                  timeout=10
+              )
+              if response_total.status_code in (200, 206):
+                  content_range = response_total.headers.get('Content-Range', '0-0/0')
+                  total = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  total = '0'
+              
+              # Recent videos (last hour)
+              one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+              response_recent = requests.get(
+                  f'{supabase_url}/rest/v1/videos',
+                  headers=headers,
+                  params={'select': 'code', 'scraped_at': f'gte.{one_hour_ago}', 'limit': 0},
+                  timeout=10
+              )
+              if response_recent.status_code in (200, 206):
+                  content_range = response_recent.headers.get('Content-Range', '0-0/0')
+                  recent = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  recent = '0'
+              
+              # Failed videos
+              response_failed = requests.get(
+                  f'{supabase_url}/rest/v1/scraper_failed',
+                  headers=headers,
+                  params={'select': 'code', 'limit': 0},
+                  timeout=10
+              )
+              if response_failed.status_code in (200, 206):
+                  content_range = response_failed.headers.get('Content-Range', '0-0/0')
+                  failed = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  failed = '0'
+              
+              # Active sessions
+              response_active = requests.get(
+                  f'{supabase_url}/rest/v1/scraper_progress',
+                  headers=headers,
+                  params={'select': 'id', 'is_active': 'eq.true', 'limit': 0},
+                  timeout=10
+              )
+              if response_active.status_code in (200, 206):
+                  content_range = response_active.headers.get('Content-Range', '0-0/0')
+                  active = content_range.split('/')[-1] if '/' in content_range else '0'
+              else:
+                  active = '0'
+              
+              print('')
+              print('=' * 60)
+              print('DATABASE STATISTICS')
+              print('=' * 60)
+              try:
+                  print(f'Total videos:        {int(total):,}')
+                  print(f'Added last hour:     {int(recent):,}')
+                  print(f'Failed videos:       {int(failed):,}')
+                  print(f'Active sessions:     {active}')
+              except (ValueError, TypeError) as e:
+                  print(f'Total videos:        {total}')
+                  print(f'Added last hour:     {recent}')
+                  print(f'Failed videos:       {failed}')
+                  print(f'Active sessions:     {active}')
+              print(f'Time:                {datetime.now(timezone.utc).strftime(\"%Y-%m-%d %H:%M:%S UTC\")}')
+              print('=' * 60)
+          except Exception as e:
+              print(f'⚠️  Could not fetch statistics: {e}')
+              sys.exit(0)  # Don't fail the workflow
+          "
+      
+      - name: Check for stuck processes
+        if: always()
+        run: |
+          echo "Checking for stuck processes..."
+          
+          # Check for zombie Chrome processes
+          CHROME_COUNT=$(pgrep -c chrome || echo 0)
+          if [ "$CHROME_COUNT" -gt 10 ]; then
+            echo "⚠️  Warning: $CHROME_COUNT Chrome processes found (possible leak)"
+          fi
+          
+          # Check for zombie Python processes
+          PYTHON_COUNT=$(pgrep -c python || echo 0)
+          if [ "$PYTHON_COUNT" -gt 5 ]; then
+            echo "⚠️  Warning: $PYTHON_COUNT Python processes found (possible leak)"
+          fi
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up processes..."
+          
+          # Kill all Chrome processes
+          pkill -9 -f chrome || true
+          pkill -9 -f chromedriver || true
+          
+          # Kill Xvfb
+          pkill -9 -f Xvfb || true
+          
+          # Kill any stuck Python processes (except current)
+          pkill -9 -f "python main.py" || true
+          
+          # Wait a moment
+          sleep 2
+          
+          # Verify cleanup
+          REMAINING=$(pgrep -c chrome || echo 0)
+          if [ "$REMAINING" -eq 0 ]; then
+            echo "✅ All processes cleaned up"
+          else
+            echo "⚠️  $REMAINING processes still running"
+          fi
+      
+      - name: Upload debug files (if failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-debug-${{ github.run_number }}
+          path: |
+            scraper/*.log
+            scraper/debug_*.html
+          retention-days: 3
+          if-no-files-found: ignore

@@ -1,0 +1,15 @@
+<svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer hexagon frame -->
+  <path 
+    d="M20 2L36 11V29L20 38L4 29V11L20 2Z" 
+    stroke="currentColor" 
+    stroke-width="1.5" 
+    fill="none"
+  />
+  
+  <!-- Inner play triangle -->
+  <path 
+    d="M15 12V28L29 20L15 12Z" 
+    fill="currentColor"
+  />
+</svg>
