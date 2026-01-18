@@ -529,14 +529,9 @@ class ScraperController:
         except Exception as e:
             print(f"⚠️  Warning: Could not save state: {e}")
         
-        # Close browser to ensure clean shutdown
-        try:
-            if hasattr(self, 'scraper') and self.scraper:
-                print("Closing browser...")
-                self.scraper.close()
-                print("✓ Browser closed")
-        except Exception as e:
-            print(f"⚠️  Error closing browser: {e}")
+        # Browser will be closed in the finally block of the run() method
+        # Do not close here, as it may interrupt the current operation
+        # causing ConnectionRefusedError
     
     def get_status(self) -> dict:
         """
