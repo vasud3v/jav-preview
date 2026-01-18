@@ -13,6 +13,11 @@ console.log("Vite Config - cwd:", process.cwd());
 export default defineConfig({
   root: __dirname,
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      input: path.resolve(__dirname, 'index.html'),
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

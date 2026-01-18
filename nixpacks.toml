@@ -15,7 +15,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "cd frontend && CI=false npm run build"
+    "cd frontend && ls -la && CI=false npm run build"
 ]
 
 [start]
