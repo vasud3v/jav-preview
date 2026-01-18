@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "nodejs_20", "npm", "gcc", "gnumake"]
+nixPkgs = ["python311", "nodejs_20", "npm", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
 
 [phases.install]
 cmds = [
@@ -10,7 +10,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "cd frontend && npm run build"
+    "cd frontend && CI=false npm run build"
 ]
 
 [start]
