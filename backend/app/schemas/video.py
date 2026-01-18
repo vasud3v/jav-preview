@@ -51,3 +51,16 @@ class PaginatedResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class HomeFeedResponse(BaseModel):
+    """Unified home feed with distinct videos per section."""
+    featured: List[VideoListItem]
+    trending: List[VideoListItem]
+    popular: List[VideoListItem]
+    top_rated: List[VideoListItem]
+    new_releases: List[VideoListItem]
+    classics: List[VideoListItem]
+    top_rated: List[VideoListItem]
+    new_releases: List[VideoListItem]
+    classics: List[VideoListItem]

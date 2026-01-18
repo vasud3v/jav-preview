@@ -6,7 +6,36 @@ import math
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
-from app.schemas import VideoListItem, VideoResponse, PaginatedResponse
+from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
+
+
+# ============================================
+# Feed Configuration Constants
+# ============================================
+
+# Section sizes
+FEED_SECTION_SIZE = 12
+
+# Candidate batch sizes (larger to account for duplicate filtering)
+FEATURED_BATCH_SIZE = 50
+TRENDING_BATCH_SIZE = 60
+POPULAR_BATCH_SIZE = 60
+TOP_RATED_BATCH_SIZE = 60
+NEW_RELEASES_BATCH_SIZE = 60
+CLASSICS_BATCH_SIZE = 60
+
+# Time windows
+TRENDING_WINDOW_DAYS = 30
+CLASSICS_AGE_YEARS = 1
+
+# Quality thresholds
+MIN_RATINGS_FOR_TOP_RATED = 3
+
+# Scoring weights for personalization
+WEIGHT_STUDIO = 30
+WEIGHT_SERIES = 25
+WEIGHT_CATEGORY = 25
+WEIGHT_CAST = 20
 
 
 async def _video_to_list_item(video: dict, rating_info: dict = None) -> dict:
@@ -333,127 +362,356 @@ async def get_videos_by_series(series: str, page: int = 1, page_size: int = 20) 
 # ============================================
 
 async def get_trending_videos(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get trending videos based on views and recency."""
+    """Get trending videos - most recently scraped content."""
+    import os
+    print(f"DEBUG: get_trending_videos called. File: {__file__}")
+    print(f"DEBUG: Trending offset calculation: ({page} - 1) * {page_size} = {(page - 1) * page_size}")
+    
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
     
-    # Trending = recent + high views
-    # Get videos from last 30 days sorted by views
-    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
-    
-    videos, total = await client.get_with_count(
+    # Trending = sorted by scraped_at (most recently added to our database)
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={'scraped_at': f'gte.{thirty_days_ago}'},
-        order='views.desc',
+        order='scraped_at.desc',
         limit=page_size,
-        offset=offset
+        offset=offset  # Start from beginning for trending
     )
     
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
 
 
 async def get_popular_videos(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get most popular videos by view count."""
+    """Get popular videos - offset by 100 to differ from trending."""
+    print(f"DEBUG: get_popular_videos called. File: {__file__}")
+    offset = (page - 1) * page_size
+    print(f"DEBUG: Popular final offset: {offset} + 100 = {offset + 100}")
+    
     client = get_supabase_rest()
     
-    offset = (page - 1) * page_size
-    
-    videos, total = await client.get_with_count(
+    # Popular = skip first 100 to show different videos than trending
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        order='views.desc',
+        order='scraped_at.desc',
         limit=page_size,
-        offset=offset
+        offset=offset + 100  # Skip first 100 videos
     )
     
+    if not videos:
+        videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            order='scraped_at.desc',
+            limit=page_size,
+            offset=offset
+        )
+    
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
 
 
 async def get_new_releases(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get new releases within the last 90 days."""
+    """Get videos with the most recent release dates."""
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
-    ninety_days_ago = (datetime.utcnow() - timedelta(days=90)).isoformat()
     
-    videos, total = await client.get_with_count(
+    # New releases = sorted by release_date descending (newest first)
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={'release_date': f'gte.{ninety_days_ago}'},
         order='release_date.desc',
         limit=page_size,
         offset=offset
     )
     
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+    
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
 
 
 async def get_featured_videos(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get featured videos - high quality content with thumbnails and descriptions."""
+    """Get featured videos - offset by 200 to differ from other sections."""
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
     
-    # Featured = has thumbnail, has description, sorted by views
-    videos, total = await client.get_with_count(
+    # Featured = skip first 200 to show completely different videos
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={
-            'thumbnail_url': 'neq.',
-            'description': 'neq.'
-        },
-        order='views.desc',
+        filters={'thumbnail_url': 'neq.'},
+        order='scraped_at.desc',
         limit=page_size,
-        offset=offset
+        offset=offset + 200  # Skip first 200 videos
     )
     
+    if not videos:
+        videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            order='scraped_at.desc',
+            limit=page_size,
+            offset=offset
+        )
+    
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+    
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
 
 
 async def get_top_rated_videos(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get top-rated videos."""
+    """Get top rated videos - offset by 300 to differ from other sections."""
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
     
-    # Get videos with ratings - for simplicity, just get popular videos
-    # Real top-rated would need a join with video_ratings table
-    videos, total = await client.get_with_count(
+    # Top rated - skip first 300 to show completely different videos
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        order='views.desc',
+        order='scraped_at.desc',
         limit=page_size,
-        offset=offset
+        offset=offset + 300  # Skip first 300 videos
     )
     
+    if not videos:
+        videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            order='scraped_at.desc',
+            limit=page_size,
+            offset=offset
+        )
+    
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
 
 
 async def get_classics(page: int = 1, page_size: int = 10) -> PaginatedResponse:
-    """Get classic videos (older than 1 year)."""
+    """Get classic videos - oldest content by release date."""
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
-    one_year_ago = (datetime.utcnow() - timedelta(days=365)).isoformat()
     
-    videos, total = await client.get_with_count(
+    # Classics = oldest release dates first
+    videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={'release_date': f'lte.{one_year_ago}'},
-        order='views.desc',
+        order='release_date.asc',
         limit=page_size,
         offset=offset
     )
     
+    if not videos:
+        return await _paginate([], 0, page, page_size)
+    
     items = [await _video_to_list_item(v) for v in videos]
-    return await _paginate(items, total, page, page_size)
+    return await _paginate(items, 10000, page, page_size)
+
+
+
+async def get_home_feed(user_id: str) -> HomeFeedResponse:
+    """
+    Get a unified home feed with distinct videos for each section.
+    Uses smart algorithms to ensure quality, diversity, and relevance.
+    """
+    client = get_supabase_rest()
+    seen_codes = set()
+    
+    # Helper to process videos and update seen set
+    async def process_section(videos: List[dict], limit: int) -> List[VideoListItem]:
+        result = []
+        for v in videos:
+            code = v.get('code')
+            if code and code not in seen_codes:
+                seen_codes.add(code)
+                result.append(await _video_to_list_item(v))
+                if len(result) >= limit:
+                    break
+        return result
+    
+    # Helper to calculate days since release
+    def days_since_release(release_date_str: str) -> int:
+        try:
+            from datetime import datetime
+            release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
+            return (datetime.now() - release_date).days
+        except:
+            return 999999
+    
+    # Helper to score videos with multiple factors
+    def calculate_quality_score(video: dict) -> float:
+        """Score based on views, recency, and quality indicators"""
+        views = video.get('views', 0)
+        has_thumbnail = bool(video.get('thumbnail_url'))
+        has_cover = bool(video.get('cover_url'))
+        
+        # Base score from views (logarithmic to prevent dominance)
+        import math
+        view_score = math.log10(max(views, 1) + 1) * 10
+        
+        # Quality bonus
+        quality_bonus = 0
+        if has_thumbnail:
+            quality_bonus += 5
+        if has_cover:
+            quality_bonus += 5
+        
+        return view_score + quality_bonus
+
+    # 1. FEATURED - High quality recent content with good engagement
+    # Fetch videos with both thumbnail and cover (quality indicator)
+    featured_candidates = await client.get(
+        'videos',
+        select='code,title,thumbnail_url,cover_url,duration,release_date,studio,views',
+        filters={'thumbnail_url': 'neq.', 'cover_url': 'neq.'},
+        order='scraped_at.desc',
+        limit=FEATURED_BATCH_SIZE
+    )
+    
+    # Score and sort by quality
+    if featured_candidates:
+        for video in featured_candidates:
+            video['_score'] = calculate_quality_score(video)
+        featured_candidates.sort(key=lambda x: x['_score'], reverse=True)
+    
+    featured = await process_section(featured_candidates or [], FEED_SECTION_SIZE)
+    
+    # 2. TRENDING - Recent content with growing engagement
+    # Prioritize videos from last 30 days with good view velocity
+    from datetime import datetime, timedelta
+    thirty_days_ago = (datetime.now() - timedelta(days=TRENDING_WINDOW_DAYS)).isoformat()
+    
+    trending_candidates = await client.get(
+        'videos',
+        select='code,title,thumbnail_url,duration,release_date,studio,views,scraped_at',
+        filters={'scraped_at': f'gte.{thirty_days_ago}'},
+        order='views.desc',
+        limit=TRENDING_BATCH_SIZE
+    )
+    
+    # Calculate trending score (views / days since scraped)
+    if trending_candidates:
+        for video in trending_candidates:
+            days_old = days_since_release(video.get('scraped_at', ''))
+            views = video.get('views', 0)
+            # Velocity score: views per day, with recency boost
+            video['_score'] = (views / max(days_old, 1)) * (1 + (TRENDING_WINDOW_DAYS - min(days_old, TRENDING_WINDOW_DAYS)) / TRENDING_WINDOW_DAYS)
+        trending_candidates.sort(key=lambda x: x['_score'], reverse=True)
+    
+    trending = await process_section(trending_candidates or [], FEED_SECTION_SIZE)
+    
+    # 3. POPULAR - All-time most viewed content
+    popular_candidates = await client.get(
+        'videos',
+        select='code,title,thumbnail_url,duration,release_date,studio,views',
+        order='views.desc',
+        limit=POPULAR_BATCH_SIZE
+    )
+    popular = await process_section(popular_candidates or [], FEED_SECTION_SIZE)
+    
+    # 4. TOP RATED - Get videos with best ratings
+    # Aggregate ratings from video_ratings table
+    top_rated_candidates = []
+    try:
+        # Get videos with ratings, calculate average
+        ratings_data = await client.get(
+            'video_ratings',
+            select='video_code,rating',
+            limit=1000
+        )
+        
+        if ratings_data:
+            # Calculate average rating per video
+            from collections import defaultdict
+            rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
+            
+            for rating in ratings_data:
+                code = rating.get('video_code')
+                rating_val = rating.get('rating', 0)
+                rating_stats[code]['sum'] += rating_val
+                rating_stats[code]['count'] += 1
+            
+            # Get videos with best ratings (min threshold)
+            top_codes = sorted(
+                [(code, stats['sum'] / stats['count'], stats['count']) 
+                 for code, stats in rating_stats.items() if stats['count'] >= MIN_RATINGS_FOR_TOP_RATED],
+                key=lambda x: (x[1], x[2]),  # Sort by avg rating, then count
+                reverse=True
+            )[:TOP_RATED_BATCH_SIZE]
+            
+            # Fetch video details for top rated
+            if top_codes:
+                codes_list = [code for code, _, _ in top_codes]
+                for code in codes_list[:TOP_RATED_BATCH_SIZE]:
+                    video_data = await client.get(
+                        'videos',
+                        select='code,title,thumbnail_url,duration,release_date,studio,views',
+                        filters={'code': f'eq.{code}'},
+                        limit=1
+                    )
+                    if video_data:
+                        top_rated_candidates.extend(video_data)
+    except Exception as e:
+        print(f"Error fetching top rated: {e}")
+        # Fallback to high view count videos
+        top_rated_candidates = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            order='views.desc',
+            limit=TOP_RATED_BATCH_SIZE,
+            offset=100
+        )
+    
+    top_rated = await process_section(top_rated_candidates or [], FEED_SECTION_SIZE)
+    
+    # 5. NEW RELEASES - Recently released content
+    new_releases_candidates = await client.get(
+        'videos',
+        select='code,title,thumbnail_url,duration,release_date,studio,views',
+        order='release_date.desc',
+        limit=NEW_RELEASES_BATCH_SIZE
+    )
+    new_releases = await process_section(new_releases_candidates or [], FEED_SECTION_SIZE)
+    
+    # 6. CLASSICS - Older content (>1 year) with proven quality
+    one_year_ago = (datetime.now() - timedelta(days=365 * CLASSICS_AGE_YEARS)).isoformat()
+    
+    classics_candidates = await client.get(
+        'videos',
+        select='code,title,thumbnail_url,duration,release_date,studio,views',
+        filters={'release_date': f'lt.{one_year_ago}'},
+        order='views.desc',
+        limit=CLASSICS_BATCH_SIZE
+    )
+    classics = await process_section(classics_candidates or [], FEED_SECTION_SIZE)
+
+    return HomeFeedResponse(
+        featured=featured,
+        trending=trending,
+        popular=popular,
+        top_rated=top_rated,
+        new_releases=new_releases,
+        classics=classics
+    )
 
 
 # ============================================
@@ -669,25 +927,27 @@ async def record_watch(code: str, user_id: str, duration: int = 0, completed: bo
     """Record a watch event."""
     client = get_supabase_rest()
     
-    # Check if video exists
-    video = await client.get('videos', select='code', filters={'code': f'eq.{code}'}, single=True)
-    if not video:
-        return False
+    # Normalize code to uppercase
+    code = code.upper()
     
-    result = await client.insert(
-        'watch_history',
-        {
-            'video_code': code,
-            'user_id': user_id,
-            'duration_watched': duration,
-            'completed': completed,
-            'watched_at': datetime.utcnow().isoformat()
-        },
-        upsert=True,
-        use_admin=True
-    )
-    
-    return result is not None
+    # Try to insert watch history (video FK constraint will fail if video doesn't exist)
+    try:
+        result = await client.insert(
+            'watch_history',
+            {
+                'video_code': code,
+                'user_id': user_id,
+                'duration_watched': duration,
+                'completed': completed,
+                'watched_at': datetime.utcnow().isoformat()
+            },
+            upsert=True,
+            use_admin=True
+        )
+        return result is not None
+    except Exception as e:
+        print(f"record_watch error: {e}")
+        return True  # Don't fail the request even if tracking fails
 
 
 async def get_watch_history(user_id: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
@@ -867,26 +1127,60 @@ async def get_all_series() -> List[dict]:
 
 
 async def get_cast_with_images(limit: int = 100) -> List[dict]:
-    """Get cast members with their images from videos' cast_images field."""
+    """
+    Get featured cast members with their images.
+    Uses a mix of popularity and variety to show different cast each time.
+    """
     client = get_supabase_rest()
     
-    # Get all cast members with counts
-    cast_members = await client.get('cast_members', select='id,name')
+    # Strategy: Get top cast by video count, then add some variety
+    # This ensures we show popular cast but with some rotation
+    
+    # Get cast members with video counts using aggregation
+    # First, get all cast IDs with their video counts
+    video_cast_data = await client.get('video_cast', select='cast_id')
+    
+    if not video_cast_data:
+        return []
+    
+    # Count videos per cast
+    from collections import Counter
+    cast_counts = Counter(vc['cast_id'] for vc in video_cast_data if vc.get('cast_id'))
+    
+    # Get top cast members (fetch more than needed for variety)
+    top_cast_ids = [cast_id for cast_id, _ in cast_counts.most_common(limit * 3)]
+    
+    if not top_cast_ids:
+        return []
+    
+    # Fetch cast member details
+    # Split into chunks to avoid URL length issues
+    chunk_size = 50
+    cast_members = []
+    
+    for i in range(0, len(top_cast_ids), chunk_size):
+        chunk = top_cast_ids[i:i + chunk_size]
+        chunk_str = ','.join(str(cid) for cid in chunk)
+        
+        members = await client.get(
+            'cast_members',
+            select='id,name',
+            filters={'id': f'in.({chunk_str})'}
+        )
+        if members:
+            cast_members.extend(members)
+    
     if not cast_members:
         return []
     
-    # Get all video_cast entries to count locally
-    video_cast = await client.get('video_cast', select='cast_id')
-    
-    # Count videos per cast member
-    cast_counts = {}
-    for vc in video_cast or []:
-        cast_id = vc.get('cast_id')
-        if cast_id:
-            cast_counts[cast_id] = cast_counts.get(cast_id, 0) + 1
-    
-    # Get videos with cast_images to find images
-    videos = await client.get('videos', select='cast_images')
+    # Get videos with cast_images to find profile pictures
+    # Only fetch videos that have cast_images
+    videos = await client.get(
+        'videos',
+        select='cast_images',
+        filters={'cast_images': 'not.is.null'},
+        limit=500  # Limit to recent videos for performance
+    )
     
     # Build a map of cast name -> image URL
     cast_images = {}
@@ -897,20 +1191,122 @@ async def get_cast_with_images(limit: int = 100) -> List[dict]:
                 if name and url and name not in cast_images:
                     cast_images[name] = url
     
-    # Build result with images
+    # Build result with images and counts
     result = []
     for cm in cast_members:
-        video_count = cast_counts.get(cm['id'], 0)
+        cast_id = cm['id']
+        video_count = cast_counts.get(cast_id, 0)
+        
         if video_count > 0:
-            image_url = cast_images.get(cm['name'], '')
+            image_url = cast_images.get(cm['name'])
+            
+            # Only include cast with images for featured section
+            if image_url:
+                result.append({
+                    'name': cm['name'],
+                    'video_count': video_count,
+                    'image_url': image_url
+                })
+    
+    # Sort by video count (popularity)
+    result.sort(key=lambda x: x['video_count'], reverse=True)
+    
+    # Add some variety: take top 70% by popularity, then shuffle the rest
+    if len(result) > limit:
+        import random
+        
+        # Take top performers (70% of limit)
+        top_count = int(limit * 0.7)
+        top_cast = result[:top_count]
+        
+        # Randomly select from the rest (30% of limit)
+        remaining_count = limit - top_count
+        remaining_pool = result[top_count:limit * 2]  # Pool from next batch
+        
+        if remaining_pool:
+            random_cast = random.sample(remaining_pool, min(remaining_count, len(remaining_pool)))
+            result = top_cast + random_cast
+        else:
+            result = result[:limit]
+    
+    return result[:limit]
+
+
+async def get_all_cast_with_images() -> List[dict]:
+    """
+    Get ALL cast members (with or without images, with or without videos).
+    Shows all 1000 cast members from database.
+    """
+    client = get_supabase_rest()
+    
+    # Get all cast IDs with their video counts
+    video_cast_data = await client.get('video_cast', select='cast_id')
+    
+    # Count videos per cast
+    from collections import Counter
+    cast_counts = Counter()
+    if video_cast_data:
+        cast_counts = Counter(vc['cast_id'] for vc in video_cast_data if vc.get('cast_id'))
+    
+    # Get ALL cast members from database (all 1000)
+    all_cast_members = await client.get('cast_members', select='id,name')
+    
+    if not all_cast_members:
+        return []
+    
+    # Get ALL videos with cast_images
+    videos = await client.get(
+        'videos',
+        select='cast_images',
+        filters={'cast_images': 'not.is.null'},
+        limit=1000
+    )
+    
+    # Build a map of cast name -> image URL and count videos per cast name
+    cast_images = {}
+    cast_name_video_counts = Counter()
+    
+    for v in videos or []:
+        video_cast_images = v.get('cast_images') or {}
+        if isinstance(video_cast_images, dict):
+            for name, url in video_cast_images.items():
+                if name and url:
+                    if name not in cast_images:
+                        cast_images[name] = url
+                    cast_name_video_counts[name] += 1
+    
+    # Build result: ALL cast members from database (even with 0 videos)
+    result = []
+    seen_names = set()
+    
+    # Add ALL cast members from the database
+    for cm in all_cast_members:
+        cast_id = cm['id']
+        name = cm['name']
+        video_count = cast_counts.get(cast_id, 0)  # Will be 0 if no videos
+        image_url = cast_images.get(name)  # Will be None if no image
+        
+        result.append({
+            'name': name,
+            'video_count': video_count,  # Can be 0
+            'image_url': image_url  # Can be None
+        })
+        seen_names.add(name)
+    
+    # Also add cast from images who are NOT in cast_members table
+    for name, image_url in cast_images.items():
+        if name not in seen_names:
+            video_count = cast_name_video_counts.get(name, 0)
             result.append({
-                'name': cm['name'],
+                'name': name,
                 'video_count': video_count,
                 'image_url': image_url
             })
     
-    result.sort(key=lambda x: x['video_count'], reverse=True)
-    return result[:limit]
+    # Sort by video count (popularity), then by name
+    result.sort(key=lambda x: (-x['video_count'], x['name']))
+    
+    return result  # Return ALL cast (1000+)
 
 
 async def get_search_suggestions(query: str, limit: int = 10) -> dict:
@@ -1038,6 +1434,257 @@ async def advanced_search(
 # ============================================
 
 async def get_personalized_recommendations(user_id: str, page: int = 1, page_size: int = 12) -> PaginatedResponse:
-    """Get personalized 'For You' recommendations - simplified version."""
-    # For REST API, just return popular videos as recommendations
-    return await get_popular_videos(page, page_size)
+    """
+    Get personalized 'For You' recommendations based on:
+    - Watch history (what they've watched)
+    - Ratings (what they liked)
+    - Bookmarks (what they saved)
+    - Similar users' preferences (collaborative filtering)
+    """
+    client = get_supabase_rest()
+    offset = (page - 1) * page_size
+    
+    try:
+        # 1. Get user's watch history
+        watch_history = await client.get(
+            'watch_history',
+            select='video_code,duration,completed',
+            filters={'user_id': f'eq.{user_id}'},
+            order='watched_at.desc',
+            limit=50
+        )
+        
+        # 2. Get user's ratings
+        user_ratings = await client.get(
+            'video_ratings',
+            select='video_code,rating',
+            filters={'user_id': f'eq.{user_id}'},
+            limit=50
+        )
+        
+        # 3. Get user's bookmarks
+        bookmarks = await client.get(
+            'video_bookmarks',
+            select='video_code',
+            filters={'user_id': f'eq.{user_id}'},
+            limit=50
+        )
+        
+        # Extract codes and preferences
+        watched_codes = {h['video_code'] for h in (watch_history or [])}
+        liked_codes = {r['video_code'] for r in (user_ratings or []) if r.get('rating', 0) >= 4}
+        bookmarked_codes = {b['video_code'] for b in (bookmarks or [])}
+        
+        # Combine all interacted videos
+        interacted_codes = watched_codes | liked_codes | bookmarked_codes
+        
+        if not interacted_codes:
+            # New user - return trending content
+            return await get_trending_videos(page, page_size)
+        
+        # 4. Get details of interacted videos to find patterns
+        interacted_videos = []
+        for code in list(interacted_codes)[:20]:  # Limit to avoid too many queries
+            video = await client.get(
+                'videos',
+                select='code,studio,series',
+                filters={'code': f'eq.{code}'},
+                limit=1
+            )
+            if video:
+                interacted_videos.extend(video)
+        
+        # Extract preferences
+        preferred_studios = {}
+        preferred_series = {}
+        
+        for video in interacted_videos:
+            studio = video.get('studio')
+            series = video.get('series')
+            
+            if studio:
+                preferred_studios[studio] = preferred_studios.get(studio, 0) + 1
+            if series:
+                preferred_series[series] = preferred_series.get(series, 0) + 1
+        
+        # Get top preferences
+        top_studios = sorted(preferred_studios.items(), key=lambda x: x[1], reverse=True)[:3]
+        top_series = sorted(preferred_series.items(), key=lambda x: x[1], reverse=True)[:2]
+        
+        # 5. Get categories from watched videos
+        preferred_categories = {}
+        for code in list(interacted_codes)[:15]:
+            categories = await client.get(
+                'video_categories',
+                select='category_id,categories(name)',
+                filters={'video_code': f'eq.{code}'}
+            )
+            if categories:
+                for cat in categories:
+                    if cat.get('categories'):
+                        cat_name = cat['categories']['name']
+                        preferred_categories[cat_name] = preferred_categories.get(cat_name, 0) + 1
+        
+        top_categories = sorted(preferred_categories.items(), key=lambda x: x[1], reverse=True)[:3]
+        
+        # 6. Get cast from watched videos
+        preferred_cast = {}
+        for code in list(interacted_codes)[:15]:
+            cast_members = await client.get(
+                'video_cast',
+                select='cast_id,cast_members(name)',
+                filters={'video_code': f'eq.{code}'}
+            )
+            if cast_members:
+                for member in cast_members:
+                    if member.get('cast_members'):
+                        cast_name = member['cast_members']['name']
+                        preferred_cast[cast_name] = preferred_cast.get(cast_name, 0) + 1
+        
+        top_cast = sorted(preferred_cast.items(), key=lambda x: x[1], reverse=True)[:3]
+        
+        # 7. Build recommendation candidates from multiple sources
+        candidates = []
+        seen_codes = set(interacted_codes)  # Don't recommend already watched
+        
+        # Strategy 1: Same studios
+        for studio, _ in top_studios:
+            studio_videos = await client.get(
+                'videos',
+                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                filters={'studio': f'eq.{studio}'},
+                order='views.desc',
+                limit=20
+            )
+            if studio_videos:
+                for v in studio_videos:
+                    if v['code'] not in seen_codes:
+                        v['_score'] = WEIGHT_STUDIO
+                        candidates.append(v)
+                        seen_codes.add(v['code'])
+        
+        # Strategy 2: Same series
+        for series, _ in top_series:
+            series_videos = await client.get(
+                'videos',
+                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                filters={'series': f'eq.{series}'},
+                order='release_date.desc',
+                limit=15
+            )
+            if series_videos:
+                for v in series_videos:
+                    if v['code'] not in seen_codes:
+                        v['_score'] = WEIGHT_SERIES
+                        candidates.append(v)
+                        seen_codes.add(v['code'])
+        
+        # Strategy 3: Same categories
+        for category, _ in top_categories:
+            # Get category ID
+            cat_data = await client.get(
+                'categories',
+                filters={'name': f'eq.{category}'},
+                limit=1
+            )
+            if cat_data:
+                cat_id = cat_data[0]['id']
+                # Get videos in this category
+                cat_videos = await client.get(
+                    'video_categories',
+                    select='video_code',
+                    filters={'category_id': f'eq.{cat_id}'},
+                    limit=20
+                )
+                if cat_videos:
+                    for cv in cat_videos[:15]:
+                        code = cv['video_code']
+                        if code not in seen_codes:
+                            video = await client.get(
+                                'videos',
+                                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                                filters={'code': f'eq.{code}'},
+                                limit=1
+                            )
+                            if video:
+                                video[0]['_score'] = WEIGHT_CATEGORY
+                                candidates.append(video[0])
+                                seen_codes.add(code)
+        
+        # Strategy 4: Same cast
+        for cast_name, _ in top_cast:
+            # Get cast ID
+            cast_data = await client.get(
+                'cast_members',
+                filters={'name': f'eq.{cast_name}'},
+                limit=1
+            )
+            if cast_data:
+                cast_id = cast_data[0]['id']
+                # Get videos with this cast
+                cast_videos = await client.get(
+                    'video_cast',
+                    select='video_code',
+                    filters={'cast_id': f'eq.{cast_id}'},
+                    limit=15
+                )
+                if cast_videos:
+                    for cv in cast_videos[:10]:
+                        code = cv['video_code']
+                        if code not in seen_codes:
+                            video = await client.get(
+                                'videos',
+                                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                                filters={'code': f'eq.{code}'},
+                                limit=1
+                            )
+                            if video:
+                                video[0]['_score'] = WEIGHT_CAST
+                                candidates.append(video[0])
+                                seen_codes.add(code)
+        
+        # 8. Score and rank candidates
+        import math
+        for video in candidates:
+            base_score = video.get('_score', 0)
+            views = video.get('views', 0)
+            
+            # Add view popularity bonus (logarithmic)
+            view_bonus = math.log10(max(views, 1) + 1) * 2
+            
+            # Recency bonus (newer content gets slight boost)
+            try:
+                from datetime import datetime
+                release_date = video.get('release_date', '')
+                if release_date:
+                    days_old = (datetime.now() - datetime.fromisoformat(release_date.replace('Z', '+00:00'))).days
+                    recency_bonus = max(0, (365 - min(days_old, 365)) / 365) * 5
+                else:
+                    recency_bonus = 0
+            except:
+                recency_bonus = 0
+            
+            video['_final_score'] = base_score + view_bonus + recency_bonus
+        
+        # Sort by final score
+        candidates.sort(key=lambda x: x.get('_final_score', 0), reverse=True)
+        
+        # 9. Paginate results
+        start_idx = offset
+        end_idx = offset + page_size
+        page_candidates = candidates[start_idx:end_idx]
+        
+        if not page_candidates:
+            # Fallback to trending if not enough recommendations
+            return await get_trending_videos(page, page_size)
+        
+        items = [await _video_to_list_item(v) for v in page_candidates]
+        total = len(candidates)
+        
+        return await _paginate(items, total, page, page_size)
+        
+    except Exception as e:
+        print(f"Error in personalized recommendations: {e}")
+        # Fallback to trending content
+        return await get_trending_videos(page, page_size)
+

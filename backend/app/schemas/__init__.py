@@ -3,6 +3,7 @@ from app.schemas.video import (
     VideoResponse,
     VideoListItem,
     PaginatedResponse,
+    HomeFeedResponse,
 )
 from app.schemas.metadata import (
     StatsResponse,
@@ -21,4 +22,5 @@ __all__ = [
     "CastResponse",
     "CastWithImageResponse",
     "StudioResponse",
+    "HomeFeedResponse",
 ]

@@ -122,9 +122,11 @@ function PreviewThumbnail({ source, time }: PreviewThumbnailProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [ready, setReady] = useState(false);
+  const [seeking, setSeeking] = useState(false);
   const lastTimeRef = useRef<number>(-1);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initialize video with aggressive buffering
+  // Initialize video with optimized settings for preview
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !source) return;
@@ -137,21 +139,36 @@ function PreviewThumbnail({ source, time }: PreviewThumbnailProps) {
       }
       const hls = new Hls({
         enableWorker: true,
-        maxBufferLength: 600,        // Buffer 10 minutes
-        maxMaxBufferLength: 600,
-        maxBufferSize: 500 * 1000 * 1000, // 500MB buffer
-        startLevel: 0,               // Lowest quality for speed
+        // Optimized for quick preview seeking
+        maxBufferLength: 30,              // Smaller buffer for preview (30s)
+        maxMaxBufferLength: 60,           // Max 1 minute
+        maxBufferSize: 50 * 1000 * 1000,  // 50MB - smaller for preview
+        startLevel: 0,                    // Always lowest quality for speed
         autoStartLoad: true,
-        backBufferLength: 600,       // Keep 10 min back buffer
+        backBufferLength: 30,             // Keep 30s back buffer
         startFragPrefetch: true,
+        // Fast seeking options
+        liveSyncDurationCount: 1,
+        fragLoadingTimeOut: 10000,        // Shorter timeout for preview
+        manifestLoadingTimeOut: 5000,
+        levelLoadingTimeOut: 5000,
+        fragLoadingMaxRetry: 2,           // Fewer retries for responsiveness
+        // Low latency seeking
+        highBufferWatchdogPeriod: 0,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 3,
       });
       hlsRef.current = hls;
       hls.loadSource(proxiedUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        hls.currentLevel = 0;
+        hls.currentLevel = 0;  // Force lowest quality
         hls.loadLevel = 0;
         setReady(true);
+      });
+      // Handle fragment loaded for faster seeking
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        setSeeking(false);
       });
     } else {
       video.src = proxiedUrl;
@@ -163,29 +180,65 @@ function PreviewThumbnail({ source, time }: PreviewThumbnailProps) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+      }
     };
   }, [source]);
 
-  // Seek instantly when time changes
+  // Debounced seek for smoother preview - waits 50ms before seeking
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !ready) return;
 
-    const timeKey = Math.floor(time * 2) / 2; // Round to 0.5s
+    // Round to 1 second for preview (reduces seek frequency)
+    const timeKey = Math.floor(time);
     if (timeKey === lastTimeRef.current) return;
-    lastTimeRef.current = timeKey;
 
-    video.currentTime = time;
+    // Clear any pending seek
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+    }
+
+    // Debounce seek by 50ms to avoid rapid seeking
+    seekTimeoutRef.current = setTimeout(() => {
+      lastTimeRef.current = timeKey;
+      setSeeking(true);
+
+      // Use fastSeek if available (faster than setting currentTime)
+      if ('fastSeek' in video && typeof video.fastSeek === 'function') {
+        video.fastSeek(time);
+      } else {
+        video.currentTime = time;
+      }
+
+      // Reset seeking state after a short delay
+      setTimeout(() => setSeeking(false), 200);
+    }, 50);
+
+    return () => {
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+      }
+    };
   }, [time, ready]);
 
   return (
-    <video
-      ref={videoRef}
-      className="w-full h-full object-cover bg-zinc-900"
-      muted
-      playsInline
-      preload="auto"
-    />
+    <div className="relative w-full h-full">
+      <video
+        ref={videoRef}
+        className={`w-full h-full object-cover bg-zinc-900 transition-opacity duration-150 ${seeking ? 'opacity-70' : 'opacity-100'}`}
+        muted
+        playsInline
+        preload="metadata"
+      />
+      {/* Loading indicator while seeking */}
+      {seeking && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -234,11 +287,27 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     if (primarySource.includes('.m3u8') || primarySource.includes('playlist')) {
       if (Hls.isSupported()) {
         const hls = new Hls({
-          enableWorker: true, lowLatencyMode: false, maxBufferLength: 60, maxMaxBufferLength: 120,
-          maxBufferSize: 120 * 1000 * 1000, maxBufferHole: 0.1, startFragPrefetch: true,
-          testBandwidth: false, abrEwmaDefaultEstimate: 20000000, fragLoadingTimeOut: 20000,
-          manifestLoadingTimeOut: 10000, levelLoadingTimeOut: 10000, fragLoadingMaxRetry: 4,
-          startLevel: -1, capLevelToPlayerSize: true, backBufferLength: 90,
+          enableWorker: true,
+          lowLatencyMode: false,
+          // Aggressive buffering for smoother playback
+          maxBufferLength: 180,           // Buffer 3 minutes ahead (was 60)
+          maxMaxBufferLength: 600,        // Allow up to 10 minutes buffer (was 120)
+          maxBufferSize: 300 * 1000 * 1000, // 300MB buffer (was 120MB)
+          maxBufferHole: 0.5,             // Allow larger gaps (was 0.1)
+          startFragPrefetch: true,        // Prefetch next segment
+          testBandwidth: false,           // Skip bandwidth test
+          abrEwmaDefaultEstimate: 30000000, // Assume 30Mbps (was 20)
+          fragLoadingTimeOut: 30000,      // Longer timeout (was 20000)
+          manifestLoadingTimeOut: 15000,  // Longer manifest timeout (was 10000)
+          levelLoadingTimeOut: 15000,     // Longer level timeout (was 10000)
+          fragLoadingMaxRetry: 6,         // More retries (was 4)
+          startLevel: -1,                 // Auto select best quality
+          capLevelToPlayerSize: true,
+          backBufferLength: 300,          // Keep 5 minutes back buffer (was 90)
+          // Progressive loading - load more aggressively
+          progressive: true,
+          // High buffer goal for less rebuffering
+          highBufferWatchdogPeriod: 3,
         });
         hlsRef.current = hls;
         hls.loadSource(proxiedUrl);
@@ -246,6 +315,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           setLoading(false);
           setQualities(data.levels.map((l, i) => ({ height: l.height, index: i })).filter(l => l.height > 0).sort((a, b) => b.height - a.height));
+          // Start loading immediately
+          hls.startLoad(-1);
         });
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (data.details === 'bufferStalledError') { hls.recoverMediaError(); return; }
@@ -418,7 +489,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       tabIndex={0}
       style={{ boxShadow: `0 0 60px ${color.hex}10` }}
     >
-      <video ref={videoRef} className="w-full h-full object-contain" poster={poster} playsInline onClick={togglePlay} onDoubleClick={toggleFullscreen} />
+      <video ref={videoRef} className="w-full h-full object-contain" poster={poster} playsInline preload="auto" onClick={togglePlay} onDoubleClick={toggleFullscreen} />
 
       {/* Loading overlay */}
       {loading && !error && (

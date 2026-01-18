@@ -5,8 +5,7 @@ import AuthModal from '@/components/AuthModal';
 import SearchInput from '@/components/SearchInput';
 import { useAuth } from '@/context/AuthContext';
 import { useNeonColor } from '@/context/NeonColorContext';
-import { getUserInitials, getUserDisplayName } from '@/lib/auth';
-import Logo from '@/components/Logo';
+import Logo from './Logo';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -47,32 +46,38 @@ const Navbar = () => {
 
   // Dynamic styles based on neon color
   const styles = {
-    border: { borderColor: `rgba(${color.rgb}, 0.3)`, boxShadow: `0 1px 10px rgba(${color.rgb}, 0.15)` },
-    logoGlow: { filter: `drop-shadow(0 0 12px rgba(${color.rgb}, 0.8)) drop-shadow(0 0 20px rgba(${color.rgb}, 0.5))` },
-    activeNav: { 
-      color: color.hex, 
-      backgroundColor: `rgba(${color.rgb}, 0.15)`, 
+    border: { 
+      borderColor: `rgba(${color.rgb}, 0.3)`, 
+      boxShadow: `0 1px 10px rgba(${color.rgb}, 0.15)` 
+    },
+    logoGlow: { 
+      filter: `drop-shadow(0 0 12px rgba(${color.rgb}, 0.8)) drop-shadow(0 0 20px rgba(${color.rgb}, 0.5))` 
+    },
+    activeNav: {
+      color: color.hex,
+      backgroundColor: `rgba(${color.rgb}, 0.15)`,
       borderColor: `rgba(${color.rgb}, 0.6)`,
       boxShadow: `0 0 15px rgba(${color.rgb}, 0.4), inset 0 0 10px rgba(${color.rgb}, 0.1)`
     },
-    ring: { boxShadow: `0 0 0 2px rgba(${color.rgb}, 0.5)` },
+    ring: { 
+      boxShadow: `0 0 0 2px rgba(${color.rgb}, 0.5)` 
+    },
   };
 
   return (
     <>
-      <nav 
-        className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-b transition-all duration-300"
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/98 backdrop-blur-xl border-b transition-all duration-300"
         style={styles.border}
       >
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <Logo className="w-9 h-9 transition-all duration-300" style={styles.logoGlow} color={color.hex} />
-              <span className="text-xl font-bold text-foreground tracking-tight hidden sm:block">
-                JAV <span className="transition-colors duration-300" style={{ color: color.hex }}>Prevue</span>
-              </span>
+            <Link to="/" className="flex items-center group">
+              {/* Adjusted height to fit navbar, width auto to maintain 5:1 aspect ratio */}
+              <Logo className="h-10 w-auto transition-transform duration-300 group-hover:scale-105" />
             </Link>
+
 
             {/* Desktop Nav */}
             <div className="hidden lg:flex items-center gap-1">
@@ -83,8 +88,8 @@ const Navbar = () => {
                   <Link
                     key={link.name}
                     to={link.href}
-                    className="group flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border border-transparent text-muted-foreground hover:border-current"
-                    style={active ? styles.activeNav : undefined}
+                    className="group flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 border border-transparent hover:border-current"
+                    style={active ? styles.activeNav : { color: 'rgb(161, 161, 170)' }}
                     onMouseEnter={(e) => {
                       if (!active) {
                         e.currentTarget.style.color = color.hex;
@@ -95,7 +100,7 @@ const Navbar = () => {
                     }}
                     onMouseLeave={(e) => {
                       if (!active) {
-                        e.currentTarget.style.color = '';
+                        e.currentTarget.style.color = 'rgb(161, 161, 170)';
                         e.currentTarget.style.backgroundColor = '';
                         e.currentTarget.style.boxShadow = '';
                         e.currentTarget.style.borderColor = 'transparent';
@@ -124,14 +129,15 @@ const Navbar = () => {
                 ) : (
                   <button
                     onClick={() => setIsSearchOpen(true)}
-                    className="p-2 text-muted-foreground rounded-lg transition-all duration-300 cursor-pointer"
+                    className="p-2 rounded-lg transition-all duration-300 cursor-pointer"
+                    style={{ color: 'rgb(161, 161, 170)' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = color.hex;
                       e.currentTarget.style.boxShadow = `0 0 10px rgba(${color.rgb}, 0.3)`;
                       e.currentTarget.style.backgroundColor = `rgba(${color.rgb}, 0.1)`;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '';
+                      e.currentTarget.style.color = 'rgb(161, 161, 170)';
                       e.currentTarget.style.boxShadow = '';
                       e.currentTarget.style.backgroundColor = '';
                     }}
@@ -144,7 +150,8 @@ const Navbar = () => {
               {/* Bookmarks */}
               <Link
                 to="/bookmarks"
-                className="p-2 text-muted-foreground rounded-lg transition-all duration-300 cursor-pointer"
+                className="p-2 rounded-lg transition-all duration-300 cursor-pointer"
+                style={{ color: 'rgb(161, 161, 170)' }}
                 title="Bookmarks"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = color.hex;
@@ -152,7 +159,7 @@ const Navbar = () => {
                   e.currentTarget.style.backgroundColor = `rgba(${color.rgb}, 0.1)`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '';
+                  e.currentTarget.style.color = 'rgb(161, 161, 170)';
                   e.currentTarget.style.boxShadow = '';
                   e.currentTarget.style.backgroundColor = '';
                 }}
@@ -176,15 +183,15 @@ const Navbar = () => {
                     }}
                   >
                     {user.avatar_url ? (
-                      <img 
-                        key={user.avatar_url} 
-                        src={`${user.avatar_url}?t=${Date.now()}`} 
-                        alt="" 
+                      <img
+                        key={user.avatar_url}
+                        src={`${user.avatar_url}?t=${Date.now()}`}
+                        alt=""
                         className="w-8 h-8 rounded-full object-cover"
                         style={styles.ring}
                       />
                     ) : (
-                      <div 
+                      <div
                         className="w-8 h-8 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: `rgba(${color.rgb}, 0.2)`, ...styles.ring }}
                       >
@@ -204,7 +211,7 @@ const Navbar = () => {
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                         <div className="py-1">
-                          <button 
+                          <button
                             onClick={goToSettings}
                             className="w-full px-4 py-2.5 text-sm text-left text-foreground hover:bg-accent transition-colors flex items-center gap-3 cursor-pointer"
                           >
@@ -225,22 +232,23 @@ const Navbar = () => {
                 </div>
               ) : (
                 <div className="relative group">
-                  <button 
-                    className="p-2 text-muted-foreground rounded-lg transition-all duration-300 cursor-pointer"
+                  <button
+                    className="p-2 rounded-lg transition-all duration-300 cursor-pointer"
+                    style={{ color: 'rgb(161, 161, 170)' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = color.hex;
                       e.currentTarget.style.boxShadow = `0 0 10px rgba(${color.rgb}, 0.3)`;
                       e.currentTarget.style.backgroundColor = `rgba(${color.rgb}, 0.1)`;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '';
+                      e.currentTarget.style.color = 'rgb(161, 161, 170)';
                       e.currentTarget.style.boxShadow = '';
                       e.currentTarget.style.backgroundColor = '';
                     }}
                   >
                     <User size={20} />
                   </button>
-                  <div 
+                  <div
                     className="absolute right-0 top-full mt-2 w-40 bg-card rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all"
                     style={{ borderWidth: 1, borderColor: `rgba(${color.rgb}, 0.3)` }}
                   >
@@ -279,14 +287,15 @@ const Navbar = () => {
               {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 text-muted-foreground rounded-lg transition-all duration-300 cursor-pointer"
+                className="lg:hidden p-2 rounded-lg transition-all duration-300 cursor-pointer"
+                style={{ color: 'rgb(161, 161, 170)' }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = color.hex;
                   e.currentTarget.style.boxShadow = `0 0 10px rgba(${color.rgb}, 0.3)`;
                   e.currentTarget.style.backgroundColor = `rgba(${color.rgb}, 0.1)`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '';
+                  e.currentTarget.style.color = 'rgb(161, 161, 170)';
                   e.currentTarget.style.boxShadow = '';
                   e.currentTarget.style.backgroundColor = '';
                 }}
@@ -299,8 +308,8 @@ const Navbar = () => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div 
-            className="lg:hidden bg-card border-t"
+          <div
+            className="lg:hidden bg-zinc-950/98 border-t"
             style={{ borderColor: `rgba(${color.rgb}, 0.2)` }}
           >
             <div className="px-4 py-4 space-y-1">
@@ -312,8 +321,8 @@ const Navbar = () => {
                     key={link.name}
                     to={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300 border border-transparent text-muted-foreground"
-                    style={active ? styles.activeNav : undefined}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300 border border-transparent"
+                    style={active ? styles.activeNav : { color: 'rgb(161, 161, 170)' }}
                   >
                     <Icon size={20} fill={active ? 'currentColor' : 'none'} />
                     {link.name}
@@ -322,7 +331,7 @@ const Navbar = () => {
               })}
 
               {/* Mobile Auth */}
-              <div 
+              <div
                 className="pt-3 mt-3 border-t space-y-1"
                 style={{ borderColor: `rgba(${color.rgb}, 0.2)` }}
               >
@@ -332,7 +341,7 @@ const Navbar = () => {
                       <p className="text-sm font-medium text-foreground truncate">{getUserDisplayName(user)}</p>
                       <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>
-                    <button 
+                    <button
                       onClick={goToSettings}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent transition-all cursor-pointer"
                     >

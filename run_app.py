@@ -65,9 +65,10 @@ def run_backend():
     if sys.platform == "win32":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     
+    # Use start.py which correctly imports app.main:app from backend directory
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
-        cwd=Path(__file__).parent,
+        [sys.executable, "start.py"],
+        cwd=Path(__file__).parent / "backend",
         **kwargs
     )
     processes.append((proc, "BACKEND"))

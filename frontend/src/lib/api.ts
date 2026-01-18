@@ -147,6 +147,15 @@ export interface CastWithImage {
   video_count: number;
 }
 
+export interface HomeFeedResponse {
+  featured: VideoListItem[];
+  trending: VideoListItem[];
+  popular: VideoListItem[];
+  top_rated: VideoListItem[];
+  new_releases: VideoListItem[];
+  classics: VideoListItem[];
+}
+
 export interface Comment {
   id: number;
   video_code: string;
@@ -313,12 +322,16 @@ export const api = {
       duration: duration.toString(),
       completed: completed.toString()
     });
-    const res = await fetch(
-      `${API_BASE}/videos/${encodeURIComponent(code)}/watch?${params}`,
-      { method: 'POST' }
-    );
-    if (!res.ok) throw new Error('Failed to record watch');
-    return res.json();
+    try {
+      const res = await fetch(
+        `${API_BASE}/videos/${encodeURIComponent(code)}/watch?${params}`,
+        { method: 'POST' }
+      );
+      if (!res.ok) return { success: false }; // Silently fail
+      return res.json();
+    } catch {
+      return { success: false }; // Silently fail on network errors too
+    }
   },
 
   getRandomVideoCode: async (exclude: string[] = []) => {
@@ -331,6 +344,20 @@ export const api = {
   },
 
   // Homepage Category Endpoints
+  getHomeFeed: (userId: string) =>
+    fetchWithCache<HomeFeedResponse>(
+      `/videos/feed/home?user_id=${encodeURIComponent(userId)}`,
+      TTL.VIDEO_LIST,
+      `home-feed:${userId}`
+    ),
+
+  // Direct fetch version for use with useCachedApi hook
+  getHomeFeedDirect: async (userId: string): Promise<HomeFeedResponse> => {
+    const res = await fetch(`${API_BASE}/videos/feed/home?user_id=${encodeURIComponent(userId)}`);
+    if (!res.ok) throw new Error('Failed to fetch home feed');
+    return res.json();
+  },
+
   getTrendingVideos: (page = 1, pageSize = 10) =>
     fetchWithCache<PaginatedResponse<VideoListItem>>(
       `/videos/trending?page=${page}&page_size=${pageSize}`,
@@ -413,12 +440,26 @@ export const api = {
   getAllCastWithImages: () =>
     fetchWithCache<CastWithImage[]>('/cast/all', TTL.CAST, 'cast:all'),
 
+  // Direct fetch version for use with useCachedApi hook
+  getAllCastWithImagesDirect: async (): Promise<CastWithImage[]> => {
+    const res = await fetch(`${API_BASE}/cast/all`);
+    if (!res.ok) throw new Error('Failed to fetch all cast');
+    return res.json();
+  },
+
   getFeaturedCast: (limit = 20) =>
     fetchWithCache<CastWithImage[]>(
       `/cast/featured?limit=${limit}`,
       TTL.CAST,
       `cast:featured:${limit}`
     ),
+
+  // Direct fetch version for use with useCachedApi hook (no double caching)
+  getFeaturedCastDirect: async (limit = 20): Promise<CastWithImage[]> => {
+    const res = await fetch(`${API_BASE}/cast/featured?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch featured cast');
+    return res.json();
+  },
 
   getVideosByCast: (name: string, page = 1, pageSize = 20) =>
     fetchWithCache<PaginatedResponse<VideoListItem>>(
@@ -509,6 +550,15 @@ export const api = {
       TTL.VIDEO_LIST,
       `for-you:${userId}:${page}:${pageSize}`
     ),
+
+  // Direct fetch version for use with useCachedApi hook
+  getForYouDirect: async (userId: string, page = 1, pageSize = 12): Promise<PaginatedResponse<VideoListItem>> => {
+    const res = await fetch(
+      `${API_BASE}/videos/user/for-you?user_id=${encodeURIComponent(userId)}&page=${page}&page_size=${pageSize}`
+    );
+    if (!res.ok) throw new Error('Failed to fetch personalized recommendations');
+    return res.json();
+  },
 
   getBookmarkCount: async (userId: string) => {
     const res = await fetch(

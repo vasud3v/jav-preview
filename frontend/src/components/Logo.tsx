@@ -1,38 +1,37 @@
 import type { CSSProperties } from 'react';
 
 interface LogoProps {
-  className?: string;
-  color?: string;
-  style?: CSSProperties;
+    className?: string; // Kept for compatibility, but the SVG has fixed wide aspect ratio
+    color?: string;    // Not used in this specific static SVG, but kept for interface
+    style?: CSSProperties;
 }
 
-export default function Logo({ className = '', color = '#22d3ee', style }: LogoProps) {
-  return (
-    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className={`${className} group-hover:scale-110 transition-transform duration-300`} style={style}>
-      {/* Glow circle behind play button */}
-      <circle 
-        cx="20" 
-        cy="20" 
-        r="10" 
-        fill={color}
-        className="opacity-15 animate-pulse"
-        style={{ animationDuration: '2s' }}
-      />
-      
-      {/* Outer hexagon frame - rotates on hover */}
-      <path 
-        d="M20 2L36 11V29L20 38L4 29V11L20 2Z" 
-        stroke={color}
-        strokeWidth="1.5" 
-        fill="none"
-        className="origin-center group-hover:rotate-[30deg] transition-transform duration-500"
-      />
-      
-      {/* Inner play triangle */}
-      <path 
-        d="M15 12V28L29 20L15 12Z" 
-        fill={color}
-      />
-    </svg>
-  );
+export default function Logo({ className = '', style }: LogoProps) {
+    // User provided SVG:
+    // <svg width="1200" height="240" viewBox="0 0 1200 240" xmlns="http://www.w3.org/2000/svg">
+    //   <rect width="1200" height="240" fill="#000000"/>
+    //   <text x="600" y="160" text-anchor="middle" fill="#ffffff" font-size="140" font-weight="700" font-family="Helvetica Neue, Arial, sans-serif">JAV Preview</text>
+    // </svg>
+
+    return (
+        <svg
+            viewBox="0 0 920 240"
+            xmlns="http://www.w3.org/2000/svg"
+            className={className} // Allows sizing via parent (e.g. h-10 w-auto)
+            style={style}
+        >
+
+            <text
+                x="0"
+                y="170"
+                textAnchor="start" // Changed to start for better left alignment
+                fill="#ffffff"
+                fontSize="140"
+                fontWeight="700"
+                fontFamily="Helvetica Neue, Arial, sans-serif"
+            >
+                JAV Preview
+            </text>
+        </svg>
+    );
 }

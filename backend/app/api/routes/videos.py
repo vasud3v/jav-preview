@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.config import settings
-from app.schemas import VideoResponse, PaginatedResponse
+from app.schemas import VideoResponse, PaginatedResponse, HomeFeedResponse
 from app.services import video_service_rest as video_service
 from app.core.cache import (
     videos_list_cache, video_detail_cache, search_cache, generate_cache_key
@@ -14,6 +14,17 @@ router = APIRouter(prefix="/videos", tags=["videos"])
 # ============================================
 # User-specific routes (must be before /{code} routes)
 # ============================================
+
+@router.get("/feed/home", response_model=HomeFeedResponse)
+async def get_home_feed(
+    user_id: str = Query(...)
+):
+    """
+    Get unified home feed with distinct videos for each section.
+    Prevents duplicates across Featured, Trending, Popular, New, and Classics.
+    """
+    return await video_service.get_home_feed(user_id)
+
 
 @router.get("/user/bookmarks", response_model=PaginatedResponse)
 async def get_bookmarks(
@@ -254,15 +265,9 @@ async def get_trending_videos(
     page_size: int = Query(10, ge=1, le=50)
 ):
     """Get trending videos based on views and recency."""
-    # Check cache
-    cache_key = generate_cache_key("trending", page, page_size)
-    cached = videos_list_cache.get(cache_key)
-    if cached:
-        return cached
-    
-    # Fetch and cache
+    print(f"DEBUG: Route get_trending_videos hit. Service file: {video_service.__file__}")
+    # Fetch directly without caching for now
     result = await video_service.get_trending_videos(page, page_size)
-    videos_list_cache.set(cache_key, result)
     return result
 
 
@@ -272,15 +277,8 @@ async def get_popular_videos(
     page_size: int = Query(10, ge=1, le=50)
 ):
     """Get most popular videos sorted by view count."""
-    # Check cache
-    cache_key = generate_cache_key("popular", page, page_size)
-    cached = videos_list_cache.get(cache_key)
-    if cached:
-        return cached
-    
-    # Fetch and cache
+    # Fetch directly without caching for now
     result = await video_service.get_popular_videos(page, page_size)
-    videos_list_cache.set(cache_key, result)
     return result
 
 
@@ -290,15 +288,8 @@ async def get_top_rated_videos(
     page_size: int = Query(10, ge=1, le=50)
 ):
     """Get top-rated videos with minimum rating threshold."""
-    # Check cache
-    cache_key = generate_cache_key("top-rated", page, page_size)
-    cached = videos_list_cache.get(cache_key)
-    if cached:
-        return cached
-    
-    # Fetch and cache
+    # Fetch directly without caching for now
     result = await video_service.get_top_rated_videos(page, page_size)
-    videos_list_cache.set(cache_key, result)
     return result
 
 
@@ -308,15 +299,8 @@ async def get_featured_videos(
     page_size: int = Query(10, ge=1, le=50)
 ):
     """Get featured videos based on quality score."""
-    # Check cache
-    cache_key = generate_cache_key("featured", page, page_size)
-    cached = videos_list_cache.get(cache_key)
-    if cached:
-        return cached
-    
-    # Fetch and cache
+    # Fetch directly without caching for now
     result = await video_service.get_featured_videos(page, page_size)
-    videos_list_cache.set(cache_key, result)
     return result
 
 
@@ -412,9 +396,8 @@ async def record_watch(
     completed: bool = Query(False, description="Whether video was completed")
 ):
     """Record a watch event for recommendation tracking."""
-    success = await video_service.record_watch(code, user_id, duration, completed)
-    if not success:
-        raise HTTPException(status_code=404, detail="Video not found")
+    # Fire and forget - don't fail the request if tracking fails
+    await video_service.record_watch(code, user_id, duration, completed)
     return {"success": True}
 
 

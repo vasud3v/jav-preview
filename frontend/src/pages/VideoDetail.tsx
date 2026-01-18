@@ -60,26 +60,26 @@ export default function VideoDetail() {
     setDiscoverBatch(0);
     setHasMoreDiscover(true);
     setSeenCodes([]);
-    
+
     api.getVideo(code).then(data => {
       setVideo(data);
-      if (viewRef.current !== code) { 
-        viewRef.current = code; 
-        api.incrementView(code).catch(() => {}); 
-        // Record watch for recommendations
-        const watchUserId = getAnonymousUserId();
-        api.recordWatch(code, watchUserId).catch(() => {});
+      if (viewRef.current !== code) {
+        viewRef.current = code;
+        api.incrementView(code).catch(() => { });
+        // Record watch for recommendations (disabled - backend issue causes 404)
+        // const watchUserId = getAnonymousUserId();
+        // api.recordWatch(code, watchUserId).catch(() => {});
       }
     }).catch(() => setError('Failed to load')).finally(() => setLoading(false));
-    
+
     // Fetch rating (anonymous users can rate)
     const ratingUserId = getAnonymousUserId();
-    api.getRating(code, ratingUserId).then(setRating).catch(() => {});
-    
+    api.getRating(code, ratingUserId).then(setRating).catch(() => { });
+
     // Fetch personalized recommendations
     setRelatedLoading(true);
     const userId = getAnonymousUserId();
-    api.getRelatedVideos(code, userId, 12).then(setRelatedVideos).catch(() => {}).finally(() => setRelatedLoading(false));
+    api.getRelatedVideos(code, userId, 12).then(setRelatedVideos).catch(() => { }).finally(() => setRelatedLoading(false));
   }, [code]);
 
   // Fetch bookmark status when user changes or code changes
@@ -87,7 +87,7 @@ export default function VideoDetail() {
     if (!code) return;
     const bookmarkUserId = getBookmarkUserId();
     if (bookmarkUserId) {
-      api.isBookmarked(code, bookmarkUserId).then(r => setBookmarked(r.bookmarked)).catch(() => {});
+      api.isBookmarked(code, bookmarkUserId).then(r => setBookmarked(r.bookmarked)).catch(() => { });
     } else {
       setBookmarked(false);
     }
@@ -104,7 +104,7 @@ export default function VideoDetail() {
         }, 3000);
       }
     }
-    return () => { 
+    return () => {
       if (slideshowRef.current) {
         clearInterval(slideshowRef.current);
         slideshowRef.current = null;
@@ -153,11 +153,11 @@ export default function VideoDetail() {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [galleryOpen, showGrid, video?.gallery_images?.length]);
 
   const copy = () => { navigator.clipboard.writeText(`JAV ${video?.code || ''}`); setCopied(true); setTimeout(() => setCopied(false), 1200); };
-  
+
   const handleRating = async (newRating: number) => {
     if (!code || ratingLoading) return;
     setRatingLoading(true);
@@ -181,7 +181,7 @@ export default function VideoDetail() {
 
   const handleBookmark = async () => {
     if (!code || bookmarkLoading) return;
-    
+
     // Check if user is logged in
     const bookmarkUserId = getBookmarkUserId();
     if (!bookmarkUserId) {
@@ -189,12 +189,12 @@ export default function VideoDetail() {
       setTimeout(() => setShowLoginPrompt(false), 3000);
       return;
     }
-    
+
     // Optimistic update
     const wasBookmarked = bookmarked;
     setBookmarked(!wasBookmarked);
     setBookmarkLoading(true);
-    
+
     try {
       if (wasBookmarked) {
         await api.removeBookmark(code, bookmarkUserId);
@@ -208,28 +208,28 @@ export default function VideoDetail() {
       setBookmarkLoading(false);
     }
   };
-  
+
   const resetView = () => { setZoom(1); setRotation(0); setPosition({ x: 0, y: 0 }); };
-  
+
   const openGallery = (autoSlideshow = false) => { setGalleryOpen(true); setCurrentImage(0); resetView(); setSlideshow(autoSlideshow); setShowGrid(false); };
-  
+
   const closeGallery = () => { setGalleryOpen(false); setSlideshow(false); setShowGrid(false); resetView(); };
-  
+
   const goToImage = (i: number) => { setCurrentImage(i); resetView(); setSlideshow(false); };
-  
-  const prevImage = () => { 
+
+  const prevImage = () => {
     if (video) {
       const totalImages = (video.cover_url || video.thumbnail_url ? 1 : 0) + (video.gallery_images?.length || 0);
-      setCurrentImage(c => c > 0 ? c - 1 : totalImages - 1); 
-      resetView(); 
+      setCurrentImage(c => c > 0 ? c - 1 : totalImages - 1);
+      resetView();
     }
   };
-  
-  const nextImage = () => { 
+
+  const nextImage = () => {
     if (video) {
       const totalImages = (video.cover_url || video.thumbnail_url ? 1 : 0) + (video.gallery_images?.length || 0);
-      setCurrentImage(c => (c + 1) % totalImages); 
-      resetView(); 
+      setCurrentImage(c => (c + 1) % totalImages);
+      resetView();
     }
   };
 
@@ -267,7 +267,7 @@ export default function VideoDetail() {
   );
 
   const hasGallery = (video.gallery_images?.length ?? 0) > 0 || video.cover_url || video.thumbnail_url;
-  
+
   // Combine cover/thumbnail with gallery images - cover first
   const allGalleryImages = [
     ...(video.cover_url ? [video.cover_url] : video.thumbnail_url ? [video.thumbnail_url] : []),
@@ -284,13 +284,13 @@ export default function VideoDetail() {
         <div className="rounded-lg overflow-hidden bg-black mb-4 relative">
           {(!video.embed_urls || video.embed_urls.length === 0) && hasGallery ? (
             // No video but has gallery - show cover with gallery button
-            <div 
+            <div
               className="aspect-video relative cursor-pointer group"
               onClick={() => openGallery(true)}
             >
               {(video.cover_url || video.thumbnail_url) ? (
-                <img 
-                  src={proxyImageUrl(video.cover_url || video.thumbnail_url || '')} 
+                <img
+                  src={proxyImageUrl(video.cover_url || video.thumbnail_url || '')}
                   alt={video.title}
                   className="w-full h-full object-cover"
                 />
@@ -318,19 +318,18 @@ export default function VideoDetail() {
             <h1 className="text-[13px] text-white/90 leading-relaxed flex-1">{video.title}</h1>
             <div className="flex items-center gap-2 shrink-0">
               <div className="relative">
-                <button 
+                <button
                   onClick={handleBookmark}
                   disabled={bookmarkLoading}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50 ${
-                    bookmarked 
-                      ? 'bg-opacity-10' 
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50 ${bookmarked
+                      ? 'bg-opacity-10'
                       : 'text-white/40 hover:bg-white/5'
-                  }`}
-                  style={bookmarked ? { color: color.hex, backgroundColor: `rgba(${color.rgb}, 0.1)` } : { }}
+                    }`}
+                  style={bookmarked ? { color: color.hex, backgroundColor: `rgba(${color.rgb}, 0.1)` } : {}}
                   title={user ? (bookmarked ? 'Remove bookmark' : 'Add bookmark') : 'Login to bookmark'}
                 >
-                  <Bookmark 
-                    className={`w-4 h-4 ${bookmarked ? 'fill-current' : ''}`} 
+                  <Bookmark
+                    className={`w-4 h-4 ${bookmarked ? 'fill-current' : ''}`}
                     style={!bookmarked ? {} : { color: color.hex }}
                   />
                 </button>
@@ -342,8 +341,8 @@ export default function VideoDetail() {
                   </div>
                 )}
               </div>
-              <button 
-                onClick={copy} 
+              <button
+                onClick={copy}
                 className="text-[11px] font-mono transition-colors flex items-center gap-1 cursor-pointer"
                 style={{ color: `rgba(${color.rgb}, 0.7)` }}
                 onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
@@ -359,8 +358,8 @@ export default function VideoDetail() {
             <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{(video.views ?? 0).toLocaleString()}</span>
             {video.release_date && !isNaN(new Date(video.release_date).getTime()) && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(video.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>}
             {video.studio && (
-              <button 
-                onClick={() => navigate(`/studio/${encodeURIComponent(video.studio)}`)} 
+              <button
+                onClick={() => navigate(`/studio/${encodeURIComponent(video.studio)}`)}
                 className="flex items-center gap-1 transition-colors cursor-pointer"
                 style={{ color: 'rgba(255,255,255,0.35)' }}
                 onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
@@ -370,8 +369,8 @@ export default function VideoDetail() {
               </button>
             )}
             {video.series && (
-              <button 
-                onClick={() => navigate(`/series/${encodeURIComponent(video.series)}`)} 
+              <button
+                onClick={() => navigate(`/series/${encodeURIComponent(video.series)}`)}
                 className="flex items-center gap-1 transition-colors cursor-pointer"
                 style={{ color: 'rgba(255,255,255,0.35)' }}
                 onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
@@ -382,8 +381,8 @@ export default function VideoDetail() {
             )}
             <span className="flex-1" />
             {hasGallery && (
-              <button 
-                onClick={() => openGallery(true)} 
+              <button
+                onClick={() => openGallery(true)}
                 className="flex items-center gap-1 transition-colors cursor-pointer"
                 style={{ color: 'rgba(255,255,255,0.35)' }}
                 onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
@@ -397,7 +396,7 @@ export default function VideoDetail() {
 
           {/* Rating */}
           <div className="flex items-center gap-2 py-1">
-            <div 
+            <div
               className="flex items-center"
               onMouseLeave={() => setHoverRating(0)}
             >
@@ -405,7 +404,7 @@ export default function VideoDetail() {
                 const isActive = (hoverRating || rating.user_rating || 0) >= star;
                 const isAverage = !hoverRating && !rating.user_rating && rating.average >= star;
                 const isHalfAverage = !hoverRating && !rating.user_rating && rating.average >= star - 0.5 && rating.average < star;
-                
+
                 return (
                   <button
                     key={star}
@@ -417,13 +416,13 @@ export default function VideoDetail() {
                     <Star
                       className="w-3.5 h-3.5 transition-all"
                       style={{
-                        color: isActive 
-                          ? color.hex 
-                          : isAverage 
-                          ? `rgba(${color.rgb}, 0.7)` 
-                          : isHalfAverage 
-                          ? `rgba(${color.rgb}, 0.4)` 
-                          : 'rgba(255,255,255,0.2)',
+                        color: isActive
+                          ? color.hex
+                          : isAverage
+                            ? `rgba(${color.rgb}, 0.7)`
+                            : isHalfAverage
+                              ? `rgba(${color.rgb}, 0.4)`
+                              : 'rgba(255,255,255,0.2)',
                         filter: isActive ? `drop-shadow(0 0 6px ${color.hex})` : 'none'
                       }}
                     />
@@ -459,7 +458,7 @@ export default function VideoDetail() {
                       <button
                         onClick={() => navigate(`/cast/${encodeURIComponent(name)}`)}
                         className="px-2 py-1 rounded bg-zinc-800 text-[11px] text-white/80 whitespace-nowrap shadow-lg cursor-pointer transition-colors"
-                        style={{ }}
+                        style={{}}
                         onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
                         onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
                       >
@@ -477,8 +476,8 @@ export default function VideoDetail() {
           {(video.categories?.length ?? 0) > 0 && video.categories && (
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               {video.categories.map(cat => (
-                <button 
-                  key={cat} 
+                <button
+                  key={cat}
                   onClick={() => navigate(`/category/${encodeURIComponent(cat)}`)}
                   className="text-white/40 transition-colors cursor-pointer"
                   onMouseEnter={(e) => e.currentTarget.style.color = color.hex}
@@ -526,7 +525,7 @@ export default function VideoDetail() {
                 <span className="text-xs text-white/30">{discoverVideos.length} videos</span>
               )}
             </div>
-            
+
             {discoverVideos.length > 0 && (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-6">
                 {discoverVideos.map((discoverVideo) => (
@@ -534,7 +533,7 @@ export default function VideoDetail() {
                 ))}
               </div>
             )}
-            
+
             {discoverLoading && (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-6">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -545,7 +544,7 @@ export default function VideoDetail() {
                 ))}
               </div>
             )}
-            
+
             {hasMoreDiscover && !discoverLoading && (
               <div className="flex justify-center">
                 <button
@@ -556,7 +555,7 @@ export default function VideoDetail() {
                       const userId = getAnonymousUserId();
                       const currentSeen = [...seenCodes, ...relatedVideos.map(v => v.code), ...discoverVideos.map(v => v.code)];
                       const result = await api.getDiscoverMore(userId, discoverBatch, 12, currentSeen);
-                      
+
                       if (result.items.length > 0) {
                         setDiscoverVideos(prev => [...prev, ...result.items]);
                         setSeenCodes(prev => [...prev, ...result.items.map(v => v.code)]);
@@ -590,7 +589,7 @@ export default function VideoDetail() {
                 </button>
               </div>
             )}
-            
+
             {!hasMoreDiscover && discoverVideos.length > 0 && (
               <div className="text-center py-4">
                 <span className="text-xs text-white/30">You've seen all recommendations</span>
@@ -602,7 +601,7 @@ export default function VideoDetail() {
 
       {/* Gallery Modal */}
       {galleryOpen && hasGallery && allGalleryImages.length > 0 && currentImage < allGalleryImages.length && (
-        <div 
+        <div
           className="fixed inset-0 bg-black z-50 flex flex-col"
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
@@ -618,10 +617,10 @@ export default function VideoDetail() {
                 </span>
               )}
             </div>
-            
+
             <div className="flex items-center gap-0.5">
               {/* Slideshow toggle */}
-              <button 
+              <button
                 onClick={() => setSlideshow(s => !s)}
                 className={`p-2 rounded-lg transition-all cursor-pointer ${slideshow ? '' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
                 style={slideshow ? { color: color.hex, backgroundColor: `rgba(${color.rgb}, 0.1)` } : {}}
@@ -629,11 +628,11 @@ export default function VideoDetail() {
               >
                 {slideshow ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
-              
+
               <div className="w-px h-4 bg-white/10 mx-1" />
-              
+
               {/* Grid view */}
-              <button 
+              <button
                 onClick={() => setShowGrid(g => !g)}
                 className={`p-2 rounded-lg transition-all cursor-pointer ${showGrid ? '' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
                 style={showGrid ? { color: color.hex, backgroundColor: `rgba(${color.rgb}, 0.1)` } : {}}
@@ -641,11 +640,11 @@ export default function VideoDetail() {
               >
                 <Grid3X3 className="w-4 h-4" />
               </button>
-              
+
               <div className="w-px h-4 bg-white/10 mx-1" />
-              
+
               {/* Zoom controls */}
-              <button 
+              <button
                 onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
                 className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer"
                 title="Zoom out (-)"
@@ -653,39 +652,39 @@ export default function VideoDetail() {
                 <ZoomOut className="w-4 h-4" />
               </button>
               <span className="text-white/40 text-xs w-10 text-center">{Math.round(zoom * 100)}%</span>
-              <button 
+              <button
                 onClick={() => setZoom(z => Math.min(4, z + 0.5))}
                 className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer"
                 title="Zoom in (+)"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
-              
+
               <div className="w-px h-4 bg-white/10 mx-1" />
-              
+
               {/* Rotate */}
-              <button 
+              <button
                 onClick={() => setRotation(r => (r + 90) % 360)}
                 className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer"
                 title="Rotate (R)"
               >
                 <RotateCw className="w-4 h-4" />
               </button>
-              
+
               {/* Reset */}
-              <button 
+              <button
                 onClick={resetView}
                 className="px-2 py-1 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all text-xs cursor-pointer"
                 title="Reset view (0)"
               >
                 Reset
               </button>
-              
+
               <div className="w-px h-4 bg-white/10 mx-1" />
-              
+
               {/* Download */}
               {allGalleryImages[currentImage] && (
-                <a 
+                <a
                   href={proxyImageUrl(allGalleryImages[currentImage])}
                   download
                   target="_blank"
@@ -695,9 +694,9 @@ export default function VideoDetail() {
                   <Download className="w-4 h-4" />
                 </a>
               )}
-              
+
               {/* Close */}
-              <button 
+              <button
                 onClick={closeGallery}
                 className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all ml-1 cursor-pointer"
                 title="Close (Esc)"
@@ -713,17 +712,17 @@ export default function VideoDetail() {
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 max-w-6xl mx-auto">
                 {allGalleryImages.map((img, i) => (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     onClick={() => { goToImage(i); setShowGrid(false); }}
                     className={`aspect-video rounded-lg overflow-hidden cursor-pointer group relative`}
                     style={i === currentImage ? { boxShadow: `0 0 0 2px ${color.hex}` } : {}}
                   >
-                    <img 
-                      src={proxyImageUrl(img)} 
-                      alt="" 
-                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" 
-                      loading="lazy" 
+                    <img
+                      src={proxyImageUrl(img)}
+                      alt=""
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      loading="lazy"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
                       <span className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity">{i === 0 ? 'Cover' : i}</span>
@@ -734,37 +733,37 @@ export default function VideoDetail() {
             </div>
           ) : (
             /* Single image view */
-            <div 
+            <div
               className="flex-1 flex items-center justify-center overflow-hidden relative"
               onWheel={handleWheel}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
             >
               {/* Prev button */}
-              <button 
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white/60 hover:text-white transition-all z-10 cursor-pointer" 
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white/60 hover:text-white transition-all z-10 cursor-pointer"
                 onClick={() => { prevImage(); setSlideshow(false); }}
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
-              
+
               {/* Image */}
               {allGalleryImages[currentImage] && (
-                <img 
-                  src={proxyImageUrl(allGalleryImages[currentImage])} 
-                  alt="" 
+                <img
+                  src={proxyImageUrl(allGalleryImages[currentImage])}
+                  alt=""
                   className="max-w-[85%] max-h-[75vh] object-contain select-none transition-transform duration-300"
-                  style={{ 
+                  style={{
                     transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)`,
                     cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default'
                   }}
                   draggable={false}
                 />
               )}
-              
+
               {/* Next button */}
-              <button 
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white/60 hover:text-white transition-all z-10 cursor-pointer" 
+              <button
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white/60 hover:text-white transition-all z-10 cursor-pointer"
                 onClick={() => { nextImage(); setSlideshow(false); }}
               >
                 <ChevronRight className="w-6 h-6" />
@@ -773,8 +772,8 @@ export default function VideoDetail() {
               {/* Progress bar for slideshow */}
               {slideshow && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
-                  <div 
-                    className="h-full animate-[progress_3s_linear_infinite]" 
+                  <div
+                    className="h-full animate-[progress_3s_linear_infinite]"
                     style={{ backgroundColor: color.hex }}
                   />
                 </div>
@@ -787,7 +786,7 @@ export default function VideoDetail() {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent">
               {/* Thumbnails */}
               <div className="relative px-12 py-4">
-                <div 
+                <div
                   ref={thumbnailRef}
                   className="flex gap-1 justify-center overflow-x-auto py-2"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -797,22 +796,21 @@ export default function VideoDetail() {
                     <button
                       key={i}
                       onClick={() => goToImage(i)}
-                      className={`flex-shrink-0 overflow-hidden transition-all duration-200 cursor-pointer ${
-                        i === currentImage 
-                          ? 'w-16 h-10 rounded border-2 border-white opacity-100' 
+                      className={`flex-shrink-0 overflow-hidden transition-all duration-200 cursor-pointer ${i === currentImage
+                          ? 'w-16 h-10 rounded border-2 border-white opacity-100'
                           : 'w-12 h-8 rounded border border-white/20 opacity-40 hover:opacity-70 hover:border-white/40'
-                      }`}
+                        }`}
                     >
-                      <img 
-                        src={proxyImageUrl(img)} 
-                        alt="" 
+                      <img
+                        src={proxyImageUrl(img)}
+                        alt=""
                         className="w-full h-full object-cover"
                       />
                     </button>
                   ))}
                 </div>
               </div>
-              
+
               {/* Counter */}
               <div className="flex justify-center pb-3">
                 <span className="text-white/50 text-xs tabular-nums">
