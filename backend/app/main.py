@@ -99,3 +99,48 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 if hasattr(signal, 'SIGTERM'):
     signal.signal(signal.SIGTERM, signal_handler)
+
+# Serve React Frontend in Production
+# This effectively allows backend and frontend to run in the same service/port
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
+
+# Calculate path to frontend/dist (assuming running from root or backend)
+# transform: /app/backend/app/main.py -> /app/frontend/dist
+# We use resolve() to get absolute path
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+frontend_dist = project_root / "frontend" / "dist"
+assets_path = frontend_dist / "assets"
+
+print(f"Frontend dist path: {frontend_dist}")
+print(f"Assets path: {assets_path}")
+
+if frontend_dist.exists():
+    print("✓ Found frontend build directory, serving static files")
+    
+    # Mount assets directory explicitly
+    # Check if assets dir exists first to avoid errors if build is partial
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+    
+    # Catch-all route for SPA (React Router)
+    # This must be the LAST route defined
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Allow API calls to pass through (though they should be caught by earlier routes)
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+            
+        # Check if a file exists specifically (e.g. favicon.ico, manifest.json)
+        file_path = frontend_dist / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+            
+        # Otherwise return index.html for SPA routing
+        return FileResponse(frontend_dist / "index.html")
+else:
+    print(f"⚠ Frontend build directory not found at {frontend_dist}")
+    print("  (This is expected during local development if not built, or if running separate services)")
