@@ -208,13 +208,13 @@ series_cache = LRUCache[list](
 cast_cache = LRUCache[list](
     name="cast",
     max_items=10,
-    ttl_seconds=300,  # 5 minutes
+    ttl_seconds=60,  # 1 minute for faster updates
 )
 
 cast_featured_cache = LRUCache[list](
     name="cast_featured",
     max_items=10,
-    ttl_seconds=300,  # 5 minutes
+    ttl_seconds=60,  # 1 minute for faster updates
 )
 
 category_videos_cache = LRUCache[dict](

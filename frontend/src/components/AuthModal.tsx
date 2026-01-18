@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, Mail, Lock, Eye, EyeOff, Loader2, User, ArrowLeft } from 'lucide-react';
+import { X, Mail, Lock, Eye, EyeOff, User, ArrowLeft } from 'lucide-react';
+import { InlineLoader } from './Loading';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/auth';
 
@@ -98,28 +99,28 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative w-full max-w-md mx-4 bg-card border border-border rounded-xl shadow-2xl">
+      <div className="relative w-full max-w-md mx-4 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-2">
           {mode === 'forgot-password' ? (
-            <button onClick={goBackToLogin} className="p-1 text-muted-foreground hover:text-foreground cursor-pointer">
+            <button onClick={goBackToLogin} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer">
               <ArrowLeft size={20} />
             </button>
           ) : (
             <div />
           )}
-          <button onClick={handleClose} className="p-1 text-muted-foreground hover:text-foreground cursor-pointer">
+          <button onClick={handleClose} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
         <div className="px-6 pb-4">
-          <h2 className="text-2xl font-bold text-foreground">
+          <h2 className="text-2xl font-bold text-zinc-100">
             {mode === 'login' && 'Welcome back'}
             {mode === 'signup' && 'Create account'}
             {mode === 'forgot-password' && 'Reset password'}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             {mode === 'login' && 'Sign in to access your favorites and watchlist'}
             {mode === 'signup' && 'Join Prevue to save favorites and track history'}
             {mode === 'forgot-password' && "Enter your email and we'll send you a reset link"}
@@ -142,8 +143,8 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
         <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
           {mode === 'signup' && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Username <span className="text-muted-foreground">(optional)</span>
+              <label className="block text-sm font-medium text-zinc-200 mb-1.5">
+                Username <span className="text-zinc-500">(optional)</span>
               </label>
               <div className="relative">
                 <input
@@ -154,15 +155,15 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
                   disabled={isLoading}
                   minLength={3}
                   maxLength={30}
-                  className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                 />
-                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+            <label className="block text-sm font-medium text-zinc-200 mb-1.5">Email</label>
             <div className="relative">
               <input
                 type="email"
@@ -171,15 +172,15 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
                 placeholder="Enter email"
                 required
                 disabled={isLoading}
-                className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
               />
-              <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
 
           {mode !== 'forgot-password' && (
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-zinc-200 mb-1.5">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -189,19 +190,19 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
                   required
                   disabled={isLoading}
                   minLength={6}
-                  className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                 />
-                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
               {mode === 'signup' && (
-                <p className="text-xs text-muted-foreground mt-1">At least 6 characters</p>
+                <p className="text-xs text-zinc-500 mt-1">At least 6 characters</p>
               )}
             </div>
           )}
@@ -219,7 +220,7 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
             disabled={isLoading}
             className="w-full py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {isLoading && <Loader2 size={18} className="animate-spin" />}
+            {isLoading && <InlineLoader />}
             {mode === 'login' && (isLoading ? 'Signing in...' : 'Sign In')}
             {mode === 'signup' && (isLoading ? 'Creating account...' : 'Create Account')}
             {mode === 'forgot-password' && (isLoading ? 'Sending...' : 'Send Reset Link')}
@@ -228,8 +229,8 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
 
         {/* Footer */}
         {mode !== 'forgot-password' && (
-          <div className="px-6 py-4 border-t border-border text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="px-6 py-4 border-t border-zinc-800 text-center">
+            <p className="text-sm text-zinc-400">
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
               <button
                 onClick={() => handleModeSwitch(mode === 'login' ? 'signup' : 'login')}

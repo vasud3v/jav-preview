@@ -1,6 +1,6 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Sparkles, Film, Star, Flame, Zap, Users, Heart, RefreshCw } from 'lucide-react';
+import { TrendingUp, Sparkles, Film, Star, Flame, Zap, Users, Heart } from 'lucide-react';
 import { api } from '@/lib/api';
 import { getAnonymousUserId } from '@/lib/user';
 import { useCachedApi, CACHE_TTL } from '@/hooks/useApi';
@@ -11,7 +11,6 @@ import CastSection from '@/components/CastSection';
 export default function Home() {
   const navigate = useNavigate();
   const userId = useMemo(() => getAnonymousUserId(), []);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch all data for homepage sections
   const forYou = useCachedApi<PaginatedResponse<VideoListItem>>(
@@ -26,7 +25,7 @@ export default function Home() {
 
   const castSection = useCachedApi<CastWithImage[]>(
     () => api.getFeaturedCastDirect(15),
-    { cacheKey: 'cast:featured:15', ttl: CACHE_TTL.MEDIUM }  // 5 minutes instead of 15
+    { cacheKey: 'cast:featured:15', ttl: CACHE_TTL.SHORT }  // 1 minute for faster updates
   );
 
   const { featured, trending, popular, top_rated, new_releases, classics } = homeFeed.data || {};
@@ -46,48 +45,20 @@ export default function Home() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [forYou, homeFeed, castSection]);
 
-  // Manual refresh handler
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await Promise.all([
-      forYou.refetch(),
-      homeFeed.refetch(),
-      castSection.refetch()
-    ]);
-    setIsRefreshing(false);
-  };
+  // Auto-refresh feed periodically (every 30 seconds)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      forYou.refetch();
+      homeFeed.refetch();
+      castSection.refetch();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [forYou, homeFeed, castSection]);
 
   return (
     <div className="container mx-auto px-4 py-6">
-      {/* Header with refresh button */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Home</h1>
-          <p className="text-sm text-white/60 mt-1">
-            {homeFeed.isStale ? 'Updating feed...' : 'Personalized for you'}
-          </p>
-        </div>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 
-                     border border-white/10 transition-all duration-200 disabled:opacity-50"
-          title="Refresh all sections"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="text-sm">Refresh</span>
-        </button>
-      </div>
 
-      {/* Update indicator */}
-      {(forYou.isStale || homeFeed.isStale) && !isRefreshing && (
-        <div className="mb-4 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            Updating feed with latest content...
-          </div>
-        </div>
-      )}
 
       {/* For You - personalized based on watch history */}
       <VideoSection
@@ -133,9 +104,10 @@ export default function Home() {
       {/* Top Rated - highest rated with minimum 3 ratings */}
       <VideoSection
         title="Top Rated"
-        icon={<Star className="w-4 h-4 text-amber-400" />}
+        icon={<Star className="w-4 h-4 text-yellow-400" />}
         videos={top_rated ?? []}
         loading={homeFeed.loading && !homeFeed.data}
+        highlightColor="#FFFF00"
       />
 
       {/* New Releases - released within last 90 days */}

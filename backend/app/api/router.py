@@ -1,7 +1,7 @@
 """Main API router - aggregates all route modules."""
 from fastapi import APIRouter
 
-from app.api.routes import videos, categories, studios, series, cast, stats, auth, upload, proxy, comments
+from app.api.routes import videos, categories, studios, series, cast, stats, auth, upload, proxy, comments, likes
 
 api_router = APIRouter(prefix="/api")
 
@@ -11,6 +11,7 @@ api_router.include_router(proxy.router)
 api_router.include_router(stats.router)
 api_router.include_router(videos.router)
 api_router.include_router(comments.router)
+api_router.include_router(likes.router)
 api_router.include_router(categories.router)
 api_router.include_router(studios.router)
 api_router.include_router(series.router)

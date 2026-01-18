@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, Calendar, Building2, Film, X, ChevronLeft, ChevronRight, ChevronDown, Copy, Check, Images, ZoomIn, ZoomOut, RotateCw, Download, Play, Pause, Grid3X3, Star, Bookmark } from 'lucide-react';
+import { ArrowLeft, Eye, Calendar, Building2, Film, X, ChevronLeft, ChevronRight, ChevronDown, Copy, Check, Images, ZoomIn, ZoomOut, RotateCw, Download, Play, Pause, Grid3X3, Star, Bookmark, Heart } from 'lucide-react';
 import { api, proxyImageUrl } from '@/lib/api';
 import { getAnonymousUserId } from '@/lib/user';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +10,7 @@ import VideoPlayer from '@/components/VideoPlayer';
 import VideoCard from '@/components/VideoCard';
 import CommentSection from '@/components/CommentSection';
 import Loading from '@/components/Loading';
+import LikeButtonStyled from '@/components/LikeButtonStyled';
 
 export default function VideoDetail() {
   const { code } = useParams<{ code: string }>();
@@ -172,6 +173,10 @@ export default function VideoDetail() {
         const result = await api.setRating(code, userId, newRating);
         setRating(result);
       }
+      
+      // Invalidate home feed cache to refresh top rated section
+      const { invalidateCache } = await import('@/hooks/useApi');
+      invalidateCache('home:feed');
     } catch {
       // Silently fail
     } finally {
@@ -317,6 +322,10 @@ export default function VideoDetail() {
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-[13px] text-white/90 leading-relaxed flex-1">{video.title}</h1>
             <div className="flex items-center gap-2 shrink-0">
+              {/* Like Button */}
+              <LikeButtonStyled videoCode={video.code} />
+              
+              {/* Bookmark Button */}
               <div className="relative">
                 <button
                   onClick={handleBookmark}
@@ -404,6 +413,7 @@ export default function VideoDetail() {
                 const isActive = (hoverRating || rating.user_rating || 0) >= star;
                 const isAverage = !hoverRating && !rating.user_rating && rating.average >= star;
                 const isHalfAverage = !hoverRating && !rating.user_rating && rating.average >= star - 0.5 && rating.average < star;
+                const neonRed = '#ff0040'; // Neon red color
 
                 return (
                   <button
@@ -415,15 +425,17 @@ export default function VideoDetail() {
                   >
                     <Star
                       className="w-3.5 h-3.5 transition-all"
+                      fill="none"
+                      strokeWidth={2}
                       style={{
                         color: isActive
-                          ? color.hex
+                          ? neonRed
                           : isAverage
-                            ? `rgba(${color.rgb}, 0.7)`
+                            ? 'rgba(255, 0, 64, 0.7)'
                             : isHalfAverage
-                              ? `rgba(${color.rgb}, 0.4)`
+                              ? 'rgba(255, 0, 64, 0.4)'
                               : 'rgba(255,255,255,0.2)',
-                        filter: isActive ? `drop-shadow(0 0 6px ${color.hex})` : 'none'
+                        filter: isActive ? `drop-shadow(0 0 6px ${neonRed})` : 'none'
                       }}
                     />
                   </button>

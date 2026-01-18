@@ -1,15 +1,20 @@
 <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Outer hexagon frame -->
-  <path 
-    d="M20 2L36 11V29L20 38L4 29V11L20 2Z" 
-    stroke="currentColor" 
-    stroke-width="1.5" 
-    fill="none"
-  />
+  <!-- Stylized 18+ badge with play button -->
+  <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="1.5" fill="none"/>
   
-  <!-- Inner play triangle -->
+  <!-- Inner circle for depth -->
+  <circle cx="20" cy="20" r="14" stroke="currentColor" stroke-width="0.5" opacity="0.3" fill="none"/>
+  
+  <!-- Play triangle with sensual curve -->
   <path 
-    d="M15 12V28L29 20L15 12Z" 
+    d="M16 11 L16 29 L30 20 Z" 
     fill="currentColor"
   />
+  
+  <!-- Subtle "18+" text at bottom -->
+  <text x="20" y="35" text-anchor="middle" font-size="5" fill="currentColor" font-weight="bold" opacity="0.6">18+</text>
+  
+  <!-- Decorative dots suggesting adult content -->
+  <circle cx="8" cy="20" r="1" fill="currentColor" opacity="0.4"/>
+  <circle cx="32" cy="20" r="1" fill="currentColor" opacity="0.4"/>
 </svg>

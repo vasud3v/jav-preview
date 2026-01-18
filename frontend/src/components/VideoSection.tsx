@@ -12,15 +12,17 @@ interface VideoSectionProps {
   loading?: boolean;
   onSeeAll?: () => void;
   onVideoClick?: (code: string) => void;
+  highlightColor?: string; // Optional highlight color for special sections
 }
 
-export default function VideoSection({ 
-  title, 
+export default function VideoSection({
+  title,
   icon,
-  videos, 
-  loading, 
+  videos,
+  loading,
   onSeeAll,
-  onVideoClick 
+  onVideoClick,
+  highlightColor
 }: VideoSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isScrolling, setIsScrolling] = useState<'left' | 'right' | null>(null);
@@ -43,7 +45,7 @@ export default function VideoSection({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {icon}
-            <h2 className="text-base font-semibold text-white">{title}</h2>
+            <h2 className="text-base font-semibold text-foreground">{title}</h2>
           </div>
         </div>
         <VideoSectionSkeleton />
@@ -60,16 +62,16 @@ export default function VideoSection({
           <span className="transition-transform duration-300 group-hover/section:scale-110">
             {icon}
           </span>
-          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => scroll('left')}
-            className={`p-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 
-              hover:scale-110 active:scale-95 text-white/50 
+            className={`p-2 rounded-full bg-muted/50 backdrop-blur-sm border border-border 
+              hover:scale-110 active:scale-95 text-muted-foreground 
               transition-all duration-200 ease-out cursor-pointer
               ${isScrolling === 'left' ? 'scale-90' : ''}`}
-            style={isScrolling === 'left' ? { 
+            style={isScrolling === 'left' ? {
               backgroundColor: `rgba(${color.rgb}, 0.3)`,
               borderColor: `rgba(${color.rgb}, 0.5)`,
               color: color.hex
@@ -81,9 +83,9 @@ export default function VideoSection({
             }}
             onMouseLeave={(e) => {
               if (isScrolling !== 'left') {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
+                e.currentTarget.style.backgroundColor = '';
+                e.currentTarget.style.borderColor = '';
+                e.currentTarget.style.color = '';
               }
             }}
           >
@@ -92,11 +94,11 @@ export default function VideoSection({
           </button>
           <button
             onClick={() => scroll('right')}
-            className={`p-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 
-              hover:scale-110 active:scale-95 text-white/50 
+            className={`p-2 rounded-full bg-muted/50 backdrop-blur-sm border border-border 
+              hover:scale-110 active:scale-95 text-muted-foreground 
               transition-all duration-200 ease-out cursor-pointer
               ${isScrolling === 'right' ? 'scale-90' : ''}`}
-            style={isScrolling === 'right' ? { 
+            style={isScrolling === 'right' ? {
               backgroundColor: `rgba(${color.rgb}, 0.3)`,
               borderColor: `rgba(${color.rgb}, 0.5)`,
               color: color.hex
@@ -108,9 +110,9 @@ export default function VideoSection({
             }}
             onMouseLeave={(e) => {
               if (isScrolling !== 'right') {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
+                e.currentTarget.style.backgroundColor = '';
+                e.currentTarget.style.borderColor = '';
+                e.currentTarget.style.color = '';
               }
             }}
           >
@@ -118,11 +120,11 @@ export default function VideoSection({
               ${isScrolling === 'right' ? 'translate-x-0.5' : ''}`} />
           </button>
           {onSeeAll && (
-            <button 
+            <button
               onClick={onSeeAll}
               className="group/btn flex items-center gap-1.5 text-xs transition-all duration-200 ml-3 px-3 py-1.5 rounded-full cursor-pointer"
-              style={{ 
-                color: color.hex, 
+              style={{
+                color: color.hex,
                 backgroundColor: `rgba(${color.rgb}, 0.1)`,
                 borderWidth: '1px',
                 borderColor: `rgba(${color.rgb}, 0.2)`
@@ -145,18 +147,18 @@ export default function VideoSection({
       <div className="relative">
         <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide scroll-smooth">
           {videos.map((video, index) => (
-            <div 
-              key={video.code} 
+            <div
+              key={video.code}
               className="flex-shrink-0 w-[110px] sm:w-[130px] md:w-[140px] lg:w-[150px] xl:w-[160px] transition-all duration-300 hover:scale-[1.02]"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <VideoCard video={video} onClick={onVideoClick} />
+              <VideoCard video={video} onClick={onVideoClick} highlightColor={highlightColor} />
             </div>
           ))}
         </div>
         {/* Fade edges */}
-        <div className="absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r from-zinc-950 to-transparent pointer-events-none opacity-50" />
-        <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-zinc-950 to-transparent pointer-events-none opacity-50" />
+        <div className="absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r from-background to-transparent pointer-events-none opacity-50" />
+        <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none opacity-50" />
       </div>
     </section>
   );

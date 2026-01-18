@@ -642,6 +642,32 @@ export const api = {
     return res.json() as Promise<{ comment_id: number; score: number; vote_count: number; user_vote: number }>;
   },
 
+  // Like system
+  getLikeStatus: async (code: string, userId: string) => {
+    const res = await fetch(
+      `${API_BASE}/likes/${encodeURIComponent(code)}?user_id=${encodeURIComponent(userId)}`
+    );
+    if (!res.ok) throw new Error('Failed to get like status');
+    return res.json() as Promise<{ liked: boolean; like_count: number }>;
+  },
+
+  toggleLike: async (code: string, userId: string) => {
+    const res = await fetch(
+      `${API_BASE}/likes/${encodeURIComponent(code)}?user_id=${encodeURIComponent(userId)}`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error('Failed to toggle like');
+    return res.json() as Promise<{ liked: boolean; like_count: number }>;
+  },
+
+  getLikedVideos: async (userId: string, page = 1, pageSize = 20) => {
+    const res = await fetch(
+      `${API_BASE}/likes/user/liked-videos?user_id=${encodeURIComponent(userId)}&page=${page}&page_size=${pageSize}`
+    );
+    if (!res.ok) throw new Error('Failed to get liked videos');
+    return res.json() as Promise<PaginatedResponse<VideoListItem>>;
+  },
+
   // Cache management
   clearCache: () => cache.invalidate(),
 };

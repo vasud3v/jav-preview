@@ -15,7 +15,7 @@ export default function VideoGrid({ videos, loading, onVideoClick }: VideoGridPr
 
   if (videos.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      <div className="text-center py-12 text-zinc-500">
         No videos found
       </div>
     );

@@ -57,7 +57,8 @@ class SupabaseRestClient:
         single: bool = False,
         order: str = None,
         limit: int = None,
-        offset: int = None
+        offset: int = None,
+        use_admin: bool = False
     ) -> Optional[Any]:
         """
         GET request to Supabase REST API.
@@ -68,14 +69,19 @@ class SupabaseRestClient:
             filters: Dict of filters (column: "eq.value" or "ilike.*value*")
             single: If True, return single object instead of list
             order: Order by column (e.g., "created_at.desc")
-            limit: Maximum rows to return
+            limit: Maximum rows to return (default: None = no limit, fetches all with pagination)
             offset: Number of rows to skip
+            use_admin: If True, use service role key to bypass RLS
             
         Returns:
             Data from Supabase or None on error
         """
         try:
             client = await self._get_client()
+            
+            # If no limit specified and not single, fetch all with pagination
+            if limit is None and not single:
+                return await self._get_all_paginated(table, select, filters, order, use_admin=use_admin)
             
             params = {'select': select}
             if filters:
@@ -87,7 +93,7 @@ class SupabaseRestClient:
             if offset is not None:
                 params['offset'] = offset
             
-            headers = {**self.headers}
+            headers = {**(self.admin_headers if use_admin else self.headers)}
             if single:
                 headers['Accept'] = 'application/vnd.pgrst.object+json'
             
@@ -109,6 +115,70 @@ class SupabaseRestClient:
         except Exception as e:
             print(f"GET {table} error: {e}")
             return None if single else []
+    
+    async def _get_all_paginated(
+        self,
+        table: str,
+        select: str = "*",
+        filters: Dict[str, str] = None,
+        order: str = None,
+        page_size: int = 1000,
+        use_admin: bool = False
+    ) -> List[Dict]:
+        """
+        Fetch all rows from a table using pagination to bypass Supabase limits.
+        
+        Args:
+            table: Table name
+            select: Columns to select
+            filters: Dict of filters
+            order: Order by column
+            page_size: Rows per page (default: 1000, Supabase's default limit)
+            use_admin: If True, use service role key to bypass RLS
+            
+        Returns:
+            List of all rows
+        """
+        all_data = []
+        offset = 0
+        
+        while True:
+            params = {'select': select, 'limit': page_size, 'offset': offset}
+            if filters:
+                params.update(filters)
+            if order:
+                params['order'] = order
+            
+            try:
+                client = await self._get_client()
+                headers = {**(self.admin_headers if use_admin else self.headers)}
+                
+                response = await client.get(
+                    f"{self.base_url}/{table}",
+                    headers=headers,
+                    params=params
+                )
+                
+                if response.status_code in (200, 206):
+                    data = response.json()
+                    if not data:
+                        break  # No more data
+                    all_data.extend(data)
+                    
+                    # If we got less than page_size, we've reached the end
+                    if len(data) < page_size:
+                        break
+                    
+                    offset += page_size
+                else:
+                    print(f"Pagination error for {table}: {response.status_code}")
+                    break
+                    
+            except Exception as e:
+                print(f"Pagination error for {table}: {e}")
+                break
+        
+        return all_data
     
     async def get_with_count(
         self,

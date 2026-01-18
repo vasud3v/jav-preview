@@ -19,12 +19,13 @@ import Calendar from './pages/Calendar';
 import SearchResults from './pages/SearchResults';
 import VideoDetail from './pages/VideoDetail';
 import Bookmarks from './pages/Bookmarks';
+import LikedVideos from './pages/LikedVideos';
 
 function App() {
   return (
     <BrowserRouter>
       <NeonColorProvider>
-        <div className="min-h-screen bg-background dark">
+        <div className="min-h-screen bg-background">
           <AgeVerification />
           <Navbar />
           <ScrollLine />
@@ -35,6 +36,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/bookmarks" element={<Bookmarks />} />
+              <Route path="/liked" element={<LikedVideos />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/categories" element={<Categories />} />
               <Route path="/casts" element={<Casts />} />

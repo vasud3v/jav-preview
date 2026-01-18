@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import loaderSvg from '@/assets/loader.svg';
+import { ZLoader, InlineLoader } from './Loading';
 
 interface SkeletonProps {
   className?: string;
@@ -7,21 +7,20 @@ interface SkeletonProps {
 
 export function Skeleton({ className }: SkeletonProps) {
   return (
-    <div 
+    <div
       className={cn(
         "animate-pulse rounded-lg bg-white/5",
         className
-      )} 
+      )}
     />
   );
 }
 
 // Centered loader with optional text
 export function Loader({ text, size = 'md' }: { text?: string; size?: 'sm' | 'md' | 'lg' }) {
-  const sizeClasses = { sm: 'w-6 h-6', md: 'w-10 h-10', lg: 'w-14 h-14' };
   return (
     <div className="flex flex-col items-center gap-2">
-      <img src={loaderSvg} alt="" className={sizeClasses[size]} />
+      <ZLoader size={size} />
       {text && <p className="text-white/50 text-xs">{text}</p>}
     </div>
   );
@@ -128,7 +127,7 @@ export function VideoDetailSkeleton() {
 export function PreviewSkeleton() {
   return (
     <div className="w-[160px] h-[90px] rounded bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center">
-      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      <InlineLoader />
     </div>
   );
 }

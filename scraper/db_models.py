@@ -206,6 +206,23 @@ class WatchHistory(Base):
     )
 
 
+class VideoLike(Base):
+    """Video like model - Instagram-style likes."""
+    __tablename__ = 'video_likes'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    video_code = Column(String(50), ForeignKey('videos.code', ondelete='CASCADE'), nullable=False)
+    user_id = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('video_code', 'user_id', name='unique_user_video_like'),
+        Index('idx_like_video', 'video_code'),
+        Index('idx_like_user', 'user_id'),
+        Index('idx_like_created', 'created_at'),
+    )
+
+
 class Comment(Base):
     """Reddit-style threaded comment model."""
     __tablename__ = 'comments'

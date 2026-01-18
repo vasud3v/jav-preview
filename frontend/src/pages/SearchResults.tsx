@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
+import {
   Search, ArrowLeft, Filter, X, ChevronDown, ChevronUp,
-  Calendar, Star, Eye, SortAsc, SortDesc, Clock, User, Building2, Film, Grid3X3
+  Calendar, Star, Eye, SortAsc, SortDesc, Clock, User, Users, Building2, Film, Grid3X3
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { VideoListItem } from '@/lib/api';
@@ -54,7 +54,7 @@ export default function SearchResults() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
-  
+
   // Search state
   const [searchInput, setSearchInput] = useState(query);
   const [videos, setVideos] = useState<VideoListItem[]>([]);
@@ -62,14 +62,14 @@ export default function SearchResults() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
   // Suggestions state
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  
+
   // Filters state
   const [showFilters, setShowFilters] = useState(false);
   const [facets, setFacets] = useState<Facets | null>(null);
@@ -77,7 +77,7 @@ export default function SearchResults() {
     sortBy: 'relevance',
     sortOrder: 'desc',
   });
-  
+
   // Search history
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
     try {
@@ -113,7 +113,7 @@ export default function SearchResults() {
   // Fetch facets when query changes
   useEffect(() => {
     if (query) {
-      api.getSearchFacets(query).then(setFacets).catch(() => {});
+      api.getSearchFacets(query).then(setFacets).catch(() => { });
     }
   }, [query]);
 
@@ -124,7 +124,7 @@ export default function SearchResults() {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     api.advancedSearch({
       q: query || undefined,
@@ -145,7 +145,7 @@ export default function SearchResults() {
         setTotalPages(res.total_pages);
         setTotal(res.total);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, [query, filters, page]);
 
@@ -188,15 +188,15 @@ export default function SearchResults() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showSuggestions || suggestions.length === 0) return;
-    
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedSuggestionIndex(prev => 
+      setSelectedSuggestionIndex(prev =>
         prev < suggestions.length - 1 ? prev + 1 : 0
       );
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedSuggestionIndex(prev => 
+      setSelectedSuggestionIndex(prev =>
         prev > 0 ? prev - 1 : suggestions.length - 1
       );
     } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
@@ -225,7 +225,7 @@ export default function SearchResults() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
-          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        inputRef.current && !inputRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
     };
@@ -239,11 +239,11 @@ export default function SearchResults() {
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 rounded-lg bg-card hover:bg-accent transition-colors cursor-pointer"
+          className="p-2 rounded-lg bg-card border border-border hover:bg-muted transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
-        
+
         <div className="flex-1">
           <h1 className="text-xl font-bold text-foreground">
             {query ? `Search: "${query}"` : 'Advanced Search'}
@@ -269,7 +269,7 @@ export default function SearchResults() {
             onFocus={() => setShowSuggestions(true)}
             onKeyDown={handleKeyDown}
             placeholder="Search videos, cast, studios, categories..."
-            className="w-full bg-card border border-border rounded-xl py-3 pl-12 pr-12 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full bg-card border border-border rounded-xl py-3 pl-12 pr-12 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           {searchInput && (
@@ -301,9 +301,8 @@ export default function SearchResults() {
                     <button
                       key={`${suggestion.type}-${suggestion.value}`}
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className={`w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors cursor-pointer ${
-                        index === selectedSuggestionIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                      }`}
+                      className={`w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors cursor-pointer ${index === selectedSuggestionIndex ? 'bg-muted' : 'hover:bg-muted/50'
+                        }`}
                     >
                       <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       <span className="text-foreground truncate">{suggestion.label}</span>
@@ -343,11 +342,10 @@ export default function SearchResults() {
         {/* Filter Toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors cursor-pointer ${
-            showFilters || activeFilterCount > 0
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-card border-border text-foreground hover:bg-accent'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors cursor-pointer ${showFilters || activeFilterCount > 0
+            ? 'bg-primary text-primary-foreground border-primary'
+            : 'bg-card text-card-foreground border-border hover:bg-muted'
+            }`}
         >
           <Filter className="w-4 h-4" />
           Filters
@@ -361,7 +359,7 @@ export default function SearchResults() {
 
         {/* Sort Dropdown */}
         <div className="relative group">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-accent transition-colors cursor-pointer">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-card-foreground hover:bg-muted transition-colors cursor-pointer">
             {filters.sortOrder === 'desc' ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
             Sort: {SORT_OPTIONS.find(o => o.value === filters.sortBy)?.label}
             <ChevronDown className="w-4 h-4" />
@@ -373,19 +371,18 @@ export default function SearchResults() {
                 <button
                   key={option.value}
                   onClick={() => setFilters(prev => ({ ...prev, sortBy: option.value }))}
-                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors cursor-pointer ${
-                    filters.sortBy === option.value ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                  }`}
+                  className={`w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors cursor-pointer ${filters.sortBy === option.value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {option.label}
                 </button>
               );
             })}
-            <div className="border-t border-border">
+            <div className="border-t border-zinc-800">
               <button
                 onClick={() => setFilters(prev => ({ ...prev, sortOrder: prev.sortOrder === 'desc' ? 'asc' : 'desc' }))}
-                className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors cursor-pointer"
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors cursor-pointer"
               >
                 {filters.sortOrder === 'desc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
                 {filters.sortOrder === 'desc' ? 'Ascending' : 'Descending'}
@@ -396,37 +393,37 @@ export default function SearchResults() {
 
         {/* Active Filter Tags */}
         {filters.category && (
-          <span className="flex items-center gap-1 px-3 py-1.5 bg-accent rounded-full text-sm text-foreground">
-            <Grid3X3 className="w-3 h-3" />
+          <span className="flex items-center gap-1 px-3 py-1.5 bg-card border border-border rounded-full text-sm text-foreground">
+            <Grid3X3 className="w-3 h-3 text-muted-foreground" />
             {filters.category}
-            <button onClick={() => clearFilter('category')} className="ml-1 hover:text-destructive cursor-pointer">
+            <button onClick={() => clearFilter('category')} className="ml-1 text-muted-foreground hover:text-red-400 cursor-pointer">
               <X className="w-3 h-3" />
             </button>
           </span>
         )}
         {filters.studio && (
-          <span className="flex items-center gap-1 px-3 py-1.5 bg-accent rounded-full text-sm text-foreground">
-            <Building2 className="w-3 h-3" />
+          <span className="flex items-center gap-1 px-3 py-1.5 bg-card border border-border rounded-full text-sm text-foreground">
+            <Building2 className="w-3 h-3 text-muted-foreground" />
             {filters.studio}
-            <button onClick={() => clearFilter('studio')} className="ml-1 hover:text-destructive cursor-pointer">
+            <button onClick={() => clearFilter('studio')} className="ml-1 text-muted-foreground hover:text-red-400 cursor-pointer">
               <X className="w-3 h-3" />
             </button>
           </span>
         )}
         {filters.cast && (
-          <span className="flex items-center gap-1 px-3 py-1.5 bg-accent rounded-full text-sm text-foreground">
-            <User className="w-3 h-3" />
+          <span className="flex items-center gap-1 px-3 py-1.5 bg-card border border-border rounded-full text-sm text-foreground">
+            <Users className="w-3 h-3 text-muted-foreground" />
             {filters.cast}
-            <button onClick={() => clearFilter('cast')} className="ml-1 hover:text-destructive cursor-pointer">
+            <button onClick={() => clearFilter('cast')} className="ml-1 text-muted-foreground hover:text-red-400 cursor-pointer">
               <X className="w-3 h-3" />
             </button>
           </span>
         )}
         {filters.minRating && (
-          <span className="flex items-center gap-1 px-3 py-1.5 bg-accent rounded-full text-sm text-foreground">
-            <Star className="w-3 h-3" />
-            {filters.minRating}+ stars
-            <button onClick={() => clearFilter('minRating')} className="ml-1 hover:text-destructive cursor-pointer">
+          <span className="flex items-center gap-1 px-3 py-1.5 bg-card border border-border rounded-full text-sm text-foreground">
+            <Star className="w-3 h-3 text-muted-foreground" />
+            {filters.minRating}+ Stars
+            <button onClick={() => clearFilter('minRating')} className="ml-1 text-muted-foreground hover:text-red-400 cursor-pointer">
               <X className="w-3 h-3" />
             </button>
           </span>
@@ -444,7 +441,7 @@ export default function SearchResults() {
                 <select
                   value={filters.category || ''}
                   onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value || undefined }))}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Categories</option>
                   {facets.categories.map((cat) => (
@@ -463,7 +460,7 @@ export default function SearchResults() {
                 <select
                   value={filters.studio || ''}
                   onChange={(e) => setFilters(prev => ({ ...prev, studio: e.target.value || undefined }))}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Studios</option>
                   {facets.studios.map((studio) => (
@@ -482,7 +479,7 @@ export default function SearchResults() {
                 <select
                   value={filters.cast || ''}
                   onChange={(e) => setFilters(prev => ({ ...prev, cast: e.target.value || undefined }))}
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Cast</option>
                   {facets.cast.map((member) => (
@@ -500,7 +497,7 @@ export default function SearchResults() {
               <select
                 value={filters.minRating || ''}
                 onChange={(e) => setFilters(prev => ({ ...prev, minRating: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               >
                 <option value="">Any Rating</option>
                 <option value="4">4+ Stars</option>
@@ -516,7 +513,7 @@ export default function SearchResults() {
                 type="date"
                 value={filters.dateFrom || ''}
                 onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value || undefined }))}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               />
             </div>
 
@@ -527,7 +524,7 @@ export default function SearchResults() {
                 type="date"
                 value={filters.dateTo || ''}
                 onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value || undefined }))}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               />
             </div>
           </div>
@@ -596,11 +593,11 @@ export default function SearchResults() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
               >
                 Previous
               </button>
-              
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum: number;
@@ -617,22 +614,21 @@ export default function SearchResults() {
                     <button
                       key={pageNum}
                       onClick={() => setPage(pageNum)}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                        page === pageNum
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card border border-border text-foreground hover:bg-accent'
-                      }`}
+                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors cursor-pointer ${page === pageNum
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card border border-border text-foreground hover:bg-muted'
+                        }`}
                     >
                       {pageNum}
                     </button>
                   );
                 })}
               </div>
-              
+
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-card border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
               >
                 Next
               </button>

@@ -4,10 +4,12 @@ import { Play, Clock, Eye, Star, Film } from 'lucide-react';
 import { useNeonColor } from '@/context/NeonColorContext';
 import type { VideoListItem } from '@/lib/api';
 import { proxyImageUrl } from '@/lib/api';
+import LikeButton from './LikeButton';
 
 interface VideoCardProps {
   video: VideoListItem;
   onClick?: (code: string) => void;
+  highlightColor?: string; // Optional neon highlight color
 }
 
 // Known placeholder image patterns from source sites
@@ -27,7 +29,7 @@ const isPlaceholderImage = (url: string | null | undefined): boolean => {
   return PLACEHOLDER_PATTERNS.some(pattern => lowerUrl.includes(pattern));
 };
 
-export default function VideoCard({ video, onClick }: VideoCardProps) {
+export default function VideoCard({ video, onClick, highlightColor }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
   const { color } = useNeonColor();
@@ -77,9 +79,9 @@ export default function VideoCard({ video, onClick }: VideoCardProps) {
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="aspect-video bg-gradient-to-br from-zinc-800 to-zinc-900 flex flex-col items-center justify-center gap-2">
-            <Film className="w-10 h-10 text-zinc-600" />
-            <span className="text-[10px] text-zinc-500 font-medium">Coming Soon</span>
+          <div className="aspect-video bg-muted flex flex-col items-center justify-center gap-2">
+            <Film className="w-10 h-10 text-muted-foreground/50" />
+            <span className="text-[10px] text-muted-foreground font-medium">Coming Soon</span>
           </div>
         )}
 
@@ -108,23 +110,39 @@ export default function VideoCard({ video, onClick }: VideoCardProps) {
       {/* Text content */}
       <div className="space-y-0.5">
         <h3 
-          className="text-white/90 text-xs font-medium leading-tight line-clamp-1 transition-colors"
+          className="text-foreground text-xs font-medium leading-tight line-clamp-1 transition-colors"
           style={{ }}
         >
           {video.title}
         </h3>
         <div className="flex items-center justify-between">
           {video.release_date && (
-            <p className="text-white/40 text-[11px] truncate">
+            <p className="text-muted-foreground text-[11px] truncate">
               {formatDate(video.release_date)}
             </p>
           )}
-          {video.rating_avg > 0 && (
-            <span className="flex items-center gap-0.5 text-[11px] text-white/40">
-              <Star className="w-3 h-3" style={{ color: color.hex, filter: `drop-shadow(0 0 3px ${color.hex})` }} />
-              {video.rating_avg.toFixed(1)}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Like icon with count */}
+            <div className="flex items-center gap-0.5">
+              <LikeButton videoCode={video.code} size="sm" showCount={true} />
+            </div>
+            
+            {/* Rating */}
+            {video.rating_avg > 0 && (
+              <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                <Star 
+                  className="w-3 h-3" 
+                  fill="none" 
+                  strokeWidth={2} 
+                  style={{ 
+                    color: highlightColor || '#ff0040', 
+                    filter: `drop-shadow(0 0 3px ${highlightColor || '#ff0040'})` 
+                  }} 
+                />
+                {video.rating_avg.toFixed(1)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

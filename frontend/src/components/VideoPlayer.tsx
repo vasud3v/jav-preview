@@ -2,98 +2,11 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Volume1, Maximize, Minimize, Settings, SkipBack, SkipForward } from 'lucide-react';
 import { useNeonColor } from '@/context/NeonColorContext';
+import { FaceLoader } from './Loading';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
-// HSL to Hex conversion
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
 
-  if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
-  else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
-  else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
-  else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
-  else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
-  else { r = c; g = 0; b = x; }
-
-  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-// Generate color variants for the loader gradient from base HSL
-function generateLoaderColors(h: number, s: number, l: number) {
-  return {
-    lead: hslToHex(h, s, l),
-    leadLight: hslToHex(h, s, Math.min(l + 15, 85)),
-    leadDark: hslToHex(h, s, Math.max(l - 8, 20)),
-    mid: hslToHex(h, Math.max(s - 5, 60), Math.min(l + 10, 75)),
-    fade: hslToHex(h, Math.max(s - 10, 50), Math.min(l + 20, 80)),
-    faint: hslToHex(h, Math.max(s - 15, 40), Math.min(l + 30, 85)),
-    faintest: hslToHex(h, Math.max(s - 20, 30), Math.min(l + 35, 90)),
-  };
-}
-
-// Video loader component using page's neon color
-function VideoLoader({ hsl }: { hsl: { h: number; s: number; l: number } }) {
-  const colors = useMemo(() => generateLoaderColors(hsl.h, hsl.s, hsl.l), [hsl.h, hsl.s, hsl.l]);
-
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-16 h-16">
-      <defs>
-        <filter id="vGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-        <filter id="vSoftGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-        <linearGradient id="vLead" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.leadLight} />
-          <stop offset="50%" stopColor={colors.lead} />
-          <stop offset="100%" stopColor={colors.leadDark} />
-        </linearGradient>
-        <linearGradient id="vMid" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.mid} />
-          <stop offset="100%" stopColor={colors.lead} />
-        </linearGradient>
-        <linearGradient id="vFade" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.fade} />
-          <stop offset="100%" stopColor={colors.mid} />
-        </linearGradient>
-      </defs>
-      <style>{`
-        .vspinner { animation: vrotate 1s cubic-bezier(0.4, 0, 0.2, 1) infinite; transform-origin: 50px 50px; }
-        @keyframes vrotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-      <g className="vspinner">
-        <circle cx="50" cy="12" r="10" fill="#0a0a0a" filter="url(#vGlow)" />
-        <circle cx="50" cy="12" r="6" fill="url(#vLead)" filter="url(#vGlow)" />
-        <circle cx="50" cy="12" r="2.5" fill="#fff" opacity="0.7" />
-        <circle cx="77" cy="23" r="8.5" fill="#0a0a0a" filter="url(#vSoftGlow)" />
-        <circle cx="77" cy="23" r="5" fill="url(#vLead)" opacity="0.85" filter="url(#vSoftGlow)" />
-        <circle cx="77" cy="23" r="2" fill="#fff" opacity="0.5" />
-        <circle cx="88" cy="50" r="7" fill="#0a0a0a" />
-        <circle cx="88" cy="50" r="4" fill="url(#vMid)" opacity="0.7" />
-        <circle cx="77" cy="77" r="6" fill="#0a0a0a" />
-        <circle cx="77" cy="77" r="3.5" fill="url(#vMid)" opacity="0.5" />
-        <circle cx="50" cy="88" r="5" fill="#0a0a0a" />
-        <circle cx="50" cy="88" r="3" fill="url(#vFade)" opacity="0.35" />
-        <circle cx="23" cy="77" r="4.5" fill="#0a0a0a" />
-        <circle cx="23" cy="77" r="2.5" fill={colors.fade} opacity="0.25" />
-        <circle cx="12" cy="50" r="4" fill="#0a0a0a" />
-        <circle cx="12" cy="50" r="2" fill={colors.faint} opacity="0.15" />
-        <circle cx="23" cy="23" r="3.5" fill="#0a0a0a" />
-        <circle cx="23" cy="23" r="1.5" fill={colors.faintest} opacity="0.1" />
-      </g>
-    </svg>
-  );
-}
 
 interface VideoPlayerProps {
   sources: string[];
@@ -494,7 +407,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       {/* Loading overlay */}
       {loading && !error && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 pointer-events-none">
-          <VideoLoader hsl={color.hsl} />
+          <FaceLoader />
         </div>
       )}
 

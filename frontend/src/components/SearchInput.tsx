@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Clock, Film, User, Building2, Grid3X3 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { WifiLoader } from './Loading';
+import { useNeonColor } from '@/context/NeonColorContext';
 
 interface Suggestion {
   type: 'video' | 'cast' | 'studio' | 'category' | 'series';
@@ -26,15 +28,16 @@ const TYPE_ICONS = {
   series: Film,
 };
 
-export default function SearchInput({ 
-  onSearch, 
-  onClose, 
+export default function SearchInput({
+  onSearch,
+  onClose,
   autoFocus = false,
   placeholder = "Search videos, cast, studios...",
   className = "",
   compact = false
 }: SearchInputProps) {
   const navigate = useNavigate();
+  const { color } = useNeonColor();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -46,7 +49,8 @@ export default function SearchInput({
       return [];
     }
   });
-  
+  const [loading, setLoading] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,10 +60,13 @@ export default function SearchInput({
       return;
     }
     try {
+      setLoading(true);
       const result = await api.getSearchSuggestions(q, 6);
       setSuggestions(result.suggestions);
     } catch {
       setSuggestions([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -104,7 +111,7 @@ export default function SearchInput({
   const handleSuggestionClick = (suggestion: Suggestion) => {
     setShowSuggestions(false);
     onClose?.();
-    
+
     if (suggestion.type === 'video') {
       navigate(`/video/${suggestion.value}`);
     } else if (suggestion.type === 'cast') {
@@ -132,7 +139,7 @@ export default function SearchInput({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const items = suggestions.length > 0 ? suggestions : (query ? [] : searchHistory.slice(0, 5));
-    
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => prev < items.length - 1 ? prev + 1 : 0);
@@ -152,7 +159,7 @@ export default function SearchInput({
     }
   };
 
-  const showDropdown = showSuggestions && (suggestions.length > 0 || (!query && searchHistory.length > 0));
+  const showDropdown = showSuggestions && (suggestions.length > 0 || (!query && searchHistory.length > 0) || loading);
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -170,11 +177,10 @@ export default function SearchInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          className={`w-full bg-input border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring ${
-            compact ? 'py-2 pl-10 pr-8 text-sm' : 'py-2.5 pl-11 pr-10'
-          }`}
+          className={`w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 ${compact ? 'py-2 pl-10 pr-8 text-sm' : 'py-2.5 pl-11 pr-10'
+            }`}
         />
-        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} />
+        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 ${compact ? 'w-4 h-4' : 'w-4 h-4'}`} />
         {query && (
           <button
             type="button"
@@ -183,7 +189,7 @@ export default function SearchInput({
               setSuggestions([]);
               inputRef.current?.focus();
             }}
-            className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer ${compact ? 'right-2' : 'right-3'}`}
+            className={`absolute top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer ${compact ? 'right-2' : 'right-3'}`}
           >
             <X className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
           </button>
@@ -191,8 +197,12 @@ export default function SearchInput({
       </form>
 
       {showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
-          {suggestions.length > 0 ? (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
+          {loading ? (
+            <div className="py-8 flex justify-center">
+              <WifiLoader />
+            </div>
+          ) : suggestions.length > 0 ? (
             <div className="py-1">
               {suggestions.map((suggestion, index) => {
                 const Icon = TYPE_ICONS[suggestion.type];
@@ -200,20 +210,22 @@ export default function SearchInput({
                   <button
                     key={`${suggestion.type}-${suggestion.value}`}
                     onClick={() => handleSuggestionClick(suggestion)}
-                    className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors cursor-pointer ${
-                      index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                    }`}
+                    className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors cursor-pointer ${index === selectedIndex
+                      ? 'bg-primary/20'
+                      : 'hover:bg-zinc-800/50 text-zinc-200'
+                      }`}
+                    style={index === selectedIndex ? { borderColor: color.hex, color: color.hex } : {}}
                   >
-                    <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-foreground text-sm truncate flex-1">{suggestion.label}</span>
-                    <span className="text-xs text-muted-foreground capitalize">{suggestion.type}</span>
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${index === selectedIndex ? '' : 'text-zinc-500'}`} />
+                    <span className="text-sm truncate flex-1">{suggestion.label}</span>
+                    <span className={`text-xs capitalize ${index === selectedIndex ? 'opacity-80' : 'text-zinc-500'}`}>{suggestion.type}</span>
                   </button>
                 );
               })}
             </div>
           ) : !query && searchHistory.length > 0 && (
             <div className="py-1">
-              <div className="px-3 py-1.5 text-xs text-muted-foreground font-medium flex items-center gap-2">
+              <div className="px-3 py-1.5 text-xs text-zinc-500 font-medium flex items-center gap-2">
                 <Clock className="w-3 h-3" />
                 Recent
               </div>
@@ -221,12 +233,11 @@ export default function SearchInput({
                 <button
                   key={item}
                   onClick={() => handleHistoryClick(item)}
-                  className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors cursor-pointer ${
-                    index === selectedIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                  }`}
+                  className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors cursor-pointer ${index === selectedIndex ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'
+                    }`}
                 >
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-foreground text-sm">{item}</span>
+                  <Clock className="w-4 h-4 text-zinc-500" />
+                  <span className="text-zinc-100 text-sm">{item}</span>
                 </button>
               ))}
             </div>

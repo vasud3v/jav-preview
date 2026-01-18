@@ -62,7 +62,7 @@ async def get_cast_debug_stats():
     from app.core.supabase_rest_client import get_supabase_rest
     client = get_supabase_rest()
     
-    # Count total cast members
+    # Count total cast members (pagination handles limits)
     cast_members = await client.get('cast_members', select='id')
     total_cast = len(cast_members) if cast_members else 0
     
@@ -89,7 +89,7 @@ async def get_cast_debug_stats():
                 if name not in cast_name_to_image:
                     cast_name_to_image[name] = url
     
-    # Get cast members from database
+    # Get cast members from database (pagination handles limits)
     all_cast_members = await client.get('cast_members', select='id,name')
     cast_member_names = {cm['name'] for cm in all_cast_members} if all_cast_members else set()
     

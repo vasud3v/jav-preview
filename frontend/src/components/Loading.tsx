@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+
 import { useNeonColor } from '@/context/NeonColorContext';
 
 interface LoadingProps {
@@ -6,235 +6,318 @@ interface LoadingProps {
   subtext?: string;
   size?: 'sm' | 'md' | 'lg';
   fullScreen?: boolean;
-  showTip?: boolean;
 }
 
-const tips = [
-  // Navigation & Discovery
-  "Use the search bar to find videos by code, title, or cast name",
-  "Click on any cast member to see all their videos",
-  "Browse by studio to discover content from your favorite producers",
-  "Categories help you find exactly what you're looking for",
-  "The trending section shows what's popular right now",
-  "Featured videos are hand-picked for quality and popularity",
-  "New releases show content from the last 90 days",
-  "Classics section features timeless favorites",
-  
-  // Bookmarks & Ratings
-  "Login to save your favorite videos to bookmarks",
-  "Rate videos to help others discover great content",
-  "Your bookmarks sync across all your devices",
-  "Videos you rate appear with a star indicator",
-  "Top rated videos have at least 3 ratings",
-  "Your ratings help improve recommendations",
-  
-  // Video Player
-  "Double-click the video to toggle fullscreen",
-  "Press Space or K to play/pause the video",
-  "Press F to enter fullscreen mode",
-  "Press M to mute/unmute the video",
-  "Use arrow keys to skip forward or backward 10 seconds",
-  "Arrow up/down adjusts the volume",
-  "Hover over the progress bar to preview scenes",
-  "Change playback speed from 0.5x to 2x",
-  "Quality settings let you choose video resolution",
-  "The player remembers your volume preference",
-  
-  // Gallery & Images
-  "Click the gallery icon to view all images",
-  "Use arrow keys to navigate through gallery images",
-  "Press G to toggle grid view in the gallery",
-  "Press Space to start/stop slideshow",
-  "Zoom in with + key, zoom out with - key",
-  "Press R to rotate images in the gallery",
-  "Press 0 to reset zoom and rotation",
-  "Download images directly from the gallery",
-  
-  // General Tips
-  "Videos are updated daily with fresh content",
-  "View counts show how popular a video is",
-  "Release dates help you find the newest content",
-  "Studio pages show all videos from that producer",
-  "Cast pages include profile images when available",
-  "The site works great on mobile devices too",
-  "Scroll horizontally through video sections",
-  "Click the logo to return to the home page",
-  
-  // Performance & Quality
-  "Videos stream in adaptive quality based on your connection",
-  "Higher quality options available for faster connections",
-  "Preview thumbnails load progressively as you browse",
-  "The player buffers ahead for smooth playback",
-  "Loading times depend on your internet speed",
-  
-  // Account Features
-  "Create an account to unlock all features",
-  "Your watch history is private and secure",
-  "Bookmarks are only visible to you",
-  "No subscription required - completely free",
-];
+// Z Loader Component
+export function ZLoader({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg' | 'inline', className?: string }) {
+  const { color } = useNeonColor();
 
-// HSL to Hex conversion
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  
-  if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
-  else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
-  else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
-  else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
-  else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
-  else { r = c; g = 0; b = x; }
-  
-  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-}
-
-// Generate color variants for the loader gradient from base HSL
-function generateLoaderColors(h: number, s: number, l: number) {
-  return {
-    lead: hslToHex(h, s, l),
-    leadLight: hslToHex(h, s, Math.min(l + 15, 85)),
-    leadDark: hslToHex(h, s, Math.max(l - 8, 20)),
-    mid: hslToHex(h, Math.max(s - 5, 60), Math.min(l + 10, 75)),
-    fade: hslToHex(h, Math.max(s - 10, 50), Math.min(l + 20, 80)),
-    faint: hslToHex(h, Math.max(s - 15, 40), Math.min(l + 30, 85)),
-    faintest: hslToHex(h, Math.max(s - 20, 30), Math.min(l + 35, 90)),
+  const sizeConfig = {
+    sm: { fontSize: '20px', className: 'w-8 h-8' },
+    md: { fontSize: '32px', className: 'w-12 h-12' },
+    lg: { fontSize: '48px', className: 'w-16 h-16' },
+    inline: { fontSize: '16px', className: 'w-5 h-5' },
   };
-}
 
-// Get a random tip
-const getRandomTip = () => tips[Math.floor(Math.random() * tips.length)];
-
-// Dynamic SVG Loader component using page's neon color
-function NeonLoader({ size, hsl }: { size: string; hsl: { h: number; s: number; l: number } }) {
-  const colors = useMemo(() => {
-    return generateLoaderColors(hsl.h, hsl.s, hsl.l);
-  }, [hsl.h, hsl.s, hsl.l]);
+  const config = sizeConfig[size] || sizeConfig.md;
 
   return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      viewBox="0 0 100 100" 
-      className={size}
-    >
-      <defs>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-        </filter>
-        <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-        </filter>
-        <linearGradient id="neonLead" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.leadLight}/>
-          <stop offset="50%" stopColor={colors.lead}/>
-          <stop offset="100%" stopColor={colors.leadDark}/>
-        </linearGradient>
-        <linearGradient id="neonMid" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.mid}/>
-          <stop offset="100%" stopColor={colors.lead}/>
-        </linearGradient>
-        <linearGradient id="neonFade" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.fade}/>
-          <stop offset="100%" stopColor={colors.mid}/>
-        </linearGradient>
-      </defs>
+    <div className={`relative ${config.className} flex items-center justify-center ${className}`} style={{ color: color.hex }}>
       <style>{`
-        .spinner { 
-          animation: rotate 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite; 
-          transform-origin: 50px 50px; 
+        .z-container .z {
+          position: absolute;
+          font-family: sans-serif; 
+          font-weight: 300;
+          opacity: 0;
+          line-height: 1;
         }
-        @keyframes rotate { 
-          from { transform: rotate(0deg); } 
-          to { transform: rotate(360deg); } 
+        .z-container .z-1 { animation: swayUpToRight 2s ease-out infinite; }
+        .z-container .z-2 { animation: swayUpToRight 2s ease-out 0.5s infinite; }
+        .z-container .z-3 { animation: swayUpToRight 2s ease-out 1s infinite; }
+        .z-container .z-4 { animation: swayUpToRight 2s ease-out 1.5s infinite; }
+
+        @keyframes swayUpToRight {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(2.5em, -3em) rotate(30deg);
+            opacity: 0;
+          }
         }
       `}</style>
-      
-      <g className="spinner">
-        {/* Lead dot - brightest and largest with strong glow */}
-        <circle cx="50" cy="12" r="11" fill="#1e1b4b" filter="url(#glow)"/>
-        <circle cx="50" cy="12" r="7" fill="url(#neonLead)" filter="url(#glow)"/>
-        <circle cx="50" cy="12" r="3" fill="#fff" opacity="0.6"/>
-        
-        {/* Second dot */}
-        <circle cx="77" cy="23" r="9.5" fill="#1e1b4b" filter="url(#softGlow)"/>
-        <circle cx="77" cy="23" r="6" fill="url(#neonLead)" opacity="0.9" filter="url(#softGlow)"/>
-        <circle cx="77" cy="23" r="2.5" fill="#fff" opacity="0.4"/>
-        
-        {/* Third dot */}
-        <circle cx="88" cy="50" r="8" fill="#1e1b4b"/>
-        <circle cx="88" cy="50" r="5" fill="url(#neonMid)" opacity="0.75"/>
-        <circle cx="88" cy="50" r="2" fill="#fff" opacity="0.25"/>
-        
-        {/* Fourth dot */}
-        <circle cx="77" cy="77" r="7" fill="#1e1b4b"/>
-        <circle cx="77" cy="77" r="4" fill="url(#neonMid)" opacity="0.55"/>
-        
-        {/* Fifth dot */}
-        <circle cx="50" cy="88" r="6" fill="#1e1b4b"/>
-        <circle cx="50" cy="88" r="3.5" fill="url(#neonFade)" opacity="0.4"/>
-        
-        {/* Sixth dot */}
-        <circle cx="23" cy="77" r="5.5" fill="#1e1b4b"/>
-        <circle cx="23" cy="77" r="3" fill={colors.fade} opacity="0.28"/>
-        
-        {/* Seventh dot */}
-        <circle cx="12" cy="50" r="5" fill="#1e1b4b"/>
-        <circle cx="12" cy="50" r="2.5" fill={colors.faint} opacity="0.18"/>
-        
-        {/* Eighth dot - faintest */}
-        <circle cx="23" cy="23" r="4.5" fill="#1e1b4b"/>
-        <circle cx="23" cy="23" r="2" fill={colors.faintest} opacity="0.1"/>
-      </g>
-    </svg>
+      <div className="z-container absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="z z-1" style={{ fontSize: config.fontSize }}>Z</div>
+        <div className="z z-2" style={{ fontSize: config.fontSize }}>Z</div>
+        <div className="z z-3" style={{ fontSize: config.fontSize }}>Z</div>
+        <div className="z z-4" style={{ fontSize: config.fontSize }}>Z</div>
+      </div>
+    </div>
   );
 }
 
-export default function Loading({ 
-  text, 
-  subtext,
-  size = 'md', 
-  fullScreen = false,
-  showTip = true
-}: LoadingProps) {
+// Wifi Loader Component (Search Loading)
+export function WifiLoader() {
   const { color } = useNeonColor();
-  
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16',
-  };
 
-  const tip = useMemo(() => getRandomTip(), []);
+  return (
+    <div className="wifi-loader-container">
+      <style>{`
+        .wifi-loader-container {
+          display: flex;
+          justify-content: center;
+          padding: 8px;
+        }
+        #wifi-loader {
+          --background: #62abff;
+          --front-color: ${color.hex};
+          --back-color: ${color.hex}40;
+          --text-color: ${color.hex}80;
+          width: 32px;
+          height: 32px;
+          border-radius: 50px;
+          position: relative;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        #wifi-loader svg {
+          position: absolute;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        #wifi-loader svg circle {
+          position: absolute;
+          fill: none;
+          stroke-width: 4px;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          transform: rotate(-100deg);
+          transform-origin: center;
+        }
+
+        #wifi-loader svg circle.back {
+          stroke: var(--back-color);
+        }
+
+        #wifi-loader svg circle.front {
+          stroke: var(--front-color);
+        }
+
+        #wifi-loader svg.circle-outer {
+          height: 48px;
+          width: 48px;
+        }
+
+        #wifi-loader svg.circle-outer circle {
+          stroke-dasharray: 62.75 188.25;
+        }
+
+        #wifi-loader svg.circle-outer circle.back {
+          animation: circle-outer135 1.8s ease infinite 0.3s;
+        }
+
+        #wifi-loader svg.circle-outer circle.front {
+          animation: circle-outer135 1.8s ease infinite 0.15s;
+        }
+
+        #wifi-loader svg.circle-middle {
+          height: 34px;
+          width: 34px;
+        }
+
+        #wifi-loader svg.circle-middle circle {
+          stroke-dasharray: 42.5 127.5;
+        }
+
+        #wifi-loader svg.circle-middle circle.back {
+          animation: circle-middle6123 1.8s ease infinite 0.25s;
+        }
+
+        #wifi-loader svg.circle-middle circle.front {
+          animation: circle-middle6123 1.8s ease infinite 0.1s;
+        }
+
+        #wifi-loader svg.circle-inner {
+          height: 20px;
+          width: 20px;
+        }
+
+        #wifi-loader svg.circle-inner circle {
+          stroke-dasharray: 22 66;
+        }
+
+        #wifi-loader svg.circle-inner circle.back {
+          animation: circle-inner162 1.8s ease infinite 0.2s;
+        }
+
+        #wifi-loader svg.circle-inner circle.front {
+          animation: circle-inner162 1.8s ease infinite 0.05s;
+        }
+
+        @keyframes circle-outer135 {
+          0% { stroke-dashoffset: 25; }
+          25% { stroke-dashoffset: 0; }
+          65% { stroke-dashoffset: 301; }
+          80% { stroke-dashoffset: 276; }
+          100% { stroke-dashoffset: 276; }
+        }
+
+        @keyframes circle-middle6123 {
+          0% { stroke-dashoffset: 17; }
+          25% { stroke-dashoffset: 0; }
+          65% { stroke-dashoffset: 204; }
+          80% { stroke-dashoffset: 187; }
+          100% { stroke-dashoffset: 187; }
+        }
+
+        @keyframes circle-inner162 {
+          0% { stroke-dashoffset: 9; }
+          25% { stroke-dashoffset: 0; }
+          65% { stroke-dashoffset: 106; }
+          80% { stroke-dashoffset: 97; }
+          100% { stroke-dashoffset: 97; }
+        }
+      `}</style>
+      <div id="wifi-loader">
+        <svg viewBox="0 0 86 86" className="circle-outer">
+          <circle r={40} cy={43} cx={43} className="back" />
+          <circle r={40} cy={43} cx={43} className="front" />
+          <circle r={40} cy={43} cx={43} className="new" />
+        </svg>
+        <svg viewBox="0 0 60 60" className="circle-middle">
+          <circle r={27} cy={30} cx={30} className="back" />
+          <circle r={27} cy={30} cx={30} className="front" />
+        </svg>
+        <svg viewBox="0 0 34 34" className="circle-inner">
+          <circle r={14} cy={17} cx={17} className="back" />
+          <circle r={14} cy={17} cx={17} className="front" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// Face Loader Component (Video Loading)
+export function FaceLoader() {
+  const { color } = useNeonColor();
+
+  return (
+    <div className="face-loader-container">
+      <style>{`
+        .face-loader-container .loader {
+          width: 6em;
+          height: 6em;
+          font-size: 10px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .face-loader-container .loader .face {
+          position: absolute;
+          border-radius: 50%;
+          border-style: solid;
+          animation: animate023845 3s linear infinite;
+        }
+
+        .face-loader-container .loader .face:nth-child(1) {
+          width: 100%;
+          height: 100%;
+          color: ${color.hex};
+          border-color: currentColor transparent transparent currentColor;
+          border-width: 0.2em 0.2em 0em 0em;
+          --deg: -45deg;
+          animation-direction: normal;
+        }
+
+        .face-loader-container .loader .face:nth-child(2) {
+          width: 70%;
+          height: 70%;
+          color: white; 
+          border-color: currentColor currentColor transparent transparent;
+          border-width: 0.2em 0em 0em 0.2em;
+          --deg: -135deg;
+          animation-direction: reverse;
+        }
+
+        .face-loader-container .loader .face .circle {
+          position: absolute;
+          width: 50%;
+          height: 0.1em;
+          top: 50%;
+          left: 50%;
+          background-color: transparent;
+          transform: rotate(var(--deg));
+          transform-origin: left;
+        }
+
+        .face-loader-container .loader .face .circle::before {
+          position: absolute;
+          top: -0.5em;
+          right: -0.5em;
+          content: '';
+          width: 1em;
+          height: 1em;
+          background-color: currentColor;
+          border-radius: 50%;
+          box-shadow: 0 0 2em,
+                        0 0 4em,
+                        0 0 6em,
+                        0 0 8em,
+                        0 0 10em,
+                        0 0 0 0.5em rgba(255, 255, 0, 0.1);
+        }
+
+        @keyframes animate023845 {
+          to {
+            transform: rotate(1turn);
+          }
+        }
+      `}</style>
+      <div className="loader">
+        <div className="face">
+          <div className="circle" />
+        </div>
+        <div className="face">
+          <div className="circle" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Loading({
+  text,
+  subtext,
+  size = 'md',
+  fullScreen = false
+}: LoadingProps) {
 
   const content = (
     <div className="flex flex-col items-center gap-4">
-      <NeonLoader size={sizeClasses[size]} hsl={color.hsl} />
+      <ZLoader size={size} />
       {(text || size === 'lg') && (
         <div className="text-center max-w-sm">
-          <p className="text-white/80 text-sm font-medium">
+          <p className="text-foreground/80 text-sm font-medium">
             {text || "Loading..."}
           </p>
           {subtext && (
-            <p className="text-white/40 text-xs mt-1">{subtext}</p>
+            <p className="text-muted-foreground text-xs mt-1">{subtext}</p>
           )}
         </div>
-      )}
-      {showTip && size === 'lg' && (
-        <p className="text-white/40 text-xs mt-2 max-w-xs text-center">💡 {tip}</p>
       )}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-zinc-950 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         {content}
       </div>
     );
@@ -245,6 +328,5 @@ export default function Loading({
 
 // Inline loader for buttons, small areas
 export function InlineLoader({ className = '' }: { className?: string }) {
-  const { color } = useNeonColor();
-  return <NeonLoader size={`w-5 h-5 ${className}`} hsl={color.hsl} />;
+  return <ZLoader size="inline" className={className} />;
 }

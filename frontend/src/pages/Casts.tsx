@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, RefreshCw } from 'lucide-react';
+import { Users, Search } from 'lucide-react';
 import { api, proxyImageUrl } from '@/lib/api';
 import type { CastWithImage } from '@/lib/api';
 import { useCachedApi, CACHE_TTL } from '@/hooks/useApi';
@@ -14,7 +14,6 @@ export default function Casts() {
   const { color } = useNeonColor();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const castData = useCachedApi<CastWithImage[]>(
     () => api.getAllCastWithImagesDirect(),
@@ -23,11 +22,14 @@ export default function Casts() {
 
   const { data: cast, loading } = castData;
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await castData.refetch();
-    setIsRefreshing(false);
-  };
+  // Auto-refresh periodically
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      castData.refetch();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [castData]);
 
   const filtered = useMemo(() => 
     (cast ?? []).filter(c => c.name.toLowerCase().includes(search.toLowerCase())),
@@ -64,26 +66,16 @@ export default function Casts() {
             <p className="text-white/50 text-sm">{filtered.length} members</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all disabled:opacity-50"
-            title="Refresh cast list"
-          >
-            <RefreshCw className={`w-4 h-4 text-white ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-          <div className="relative">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cast..."
-              className="bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 w-48"
-              style={{ '--tw-ring-color': `rgba(${color.rgb}, 0.5)` } as React.CSSProperties}
-            />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-          </div>
+        <div className="relative">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search cast..."
+            className="bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 w-48"
+            style={{ '--tw-ring-color': `rgba(${color.rgb}, 0.5)` } as React.CSSProperties}
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
         </div>
       </div>
 

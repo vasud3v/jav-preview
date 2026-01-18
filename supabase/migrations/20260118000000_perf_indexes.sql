@@ -14,3 +14,8 @@ WHERE thumbnail_url IS NOT NULL AND thumbnail_url != ''
 
 -- Index for New Releases
 CREATE INDEX IF NOT EXISTS idx_videos_release_date_desc ON videos(release_date DESC);
+
+-- Indexes for like system (feed algorithm integration)
+CREATE INDEX IF NOT EXISTS idx_video_likes_video_code ON video_likes(video_code);
+CREATE INDEX IF NOT EXISTS idx_video_likes_created_at ON video_likes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_video_likes_user_video ON video_likes(user_id, video_code);

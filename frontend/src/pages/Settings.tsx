@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Trash2, Loader2, Eye, EyeOff, Camera, Upload, X, ArrowLeft, History, Clock } from 'lucide-react';
+import { User, Lock, Trash2, Eye, EyeOff, Camera, Upload, X, ArrowLeft, History, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getUserInitials } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { getAnonymousUserId } from '@/lib/user';
 import type { VideoListItem } from '@/lib/api';
 import VideoCard from '@/components/VideoCard';
+import { InlineLoader } from '@/components/Loading';
 
 type Tab = 'profile' | 'history' | 'password' | 'danger';
 
@@ -14,7 +15,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { user, updateProfile, updatePassword, uploadAvatar, deleteAvatar, deleteAccount, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [tab, setTab] = useState<Tab>('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,7 +82,7 @@ export default function Settings() {
 
   const handleClearHistory = async () => {
     if (!confirm('Are you sure you want to clear your watch history? This cannot be undone.')) return;
-    
+
     setClearingHistory(true);
     try {
       const userId = getAnonymousUserId();
@@ -117,7 +118,7 @@ export default function Settings() {
         setAvatarFile(null);
         setAvatarPreview(null);
       }
-      
+
       // Remove avatar if requested
       if (removeAvatar && !avatarFile) {
         await deleteAvatar();
@@ -127,10 +128,10 @@ export default function Settings() {
       // Update username
       const trimmedUsername = username.trim();
       await updateProfile({ username: trimmedUsername || undefined });
-      
+
       // Refresh user data to get latest from server
       await refreshUser();
-      
+
       setSuccess('Profile updated successfully');
     } catch (err) {
       console.error('Profile update error:', err);
@@ -159,11 +160,11 @@ export default function Settings() {
     resetMessages();
     setAvatarFile(file);
     setRemoveAvatar(false);
-    
+
     // Create preview URL
     const previewUrl = URL.createObjectURL(file);
     setAvatarPreview(previewUrl);
-    
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -252,24 +253,23 @@ export default function Settings() {
       <div className="flex items-center gap-4 mb-8">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors cursor-pointer"
+          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-border mb-6">
+      <div className="flex border-b border-zinc-800 mb-6">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => { setTab(id); resetMessages(); }}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${
-              tab === id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer ${tab === id
+              ? 'border-primary text-primary'
+              : 'border-transparent text-zinc-400 hover:text-zinc-100'
+              }`}
           >
             <Icon size={16} />
             {label}
@@ -293,8 +293,8 @@ export default function Settings() {
       {tab === 'profile' && (
         <form onSubmit={handleUpdateProfile} className="space-y-6">
           {/* Avatar Section */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <h3 className="text-lg font-medium text-foreground mb-4">Avatar</h3>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+            <h3 className="text-lg font-medium text-zinc-100 mb-4">Avatar</h3>
             <div className="flex items-center gap-6">
               <div className="relative">
                 {avatarDisplay ? (
@@ -319,7 +319,7 @@ export default function Settings() {
                   <Camera size={16} />
                 </button>
               </div>
-              
+
               <div className="flex-1">
                 <input
                   ref={fileInputRef}
@@ -333,7 +333,7 @@ export default function Settings() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent text-foreground rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50 cursor-pointer"
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-100 rounded-lg hover:bg-zinc-700 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     <Upload size={16} />
                     {avatarFile ? 'Change' : 'Upload'}
@@ -354,13 +354,13 @@ export default function Settings() {
                       type="button"
                       onClick={handleCancelAvatarChange}
                       disabled={isLoading}
-                      className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:bg-accent rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                      className="flex items-center gap-2 px-4 py-2 text-zinc-400 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       Cancel
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-zinc-500 mt-2">
                   {avatarFile ? (
                     <span className="text-primary">New avatar selected - click Save to apply</span>
                   ) : removeAvatar ? (
@@ -374,22 +374,22 @@ export default function Settings() {
           </div>
 
           {/* Profile Form */}
-          <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-            <h3 className="text-lg font-medium text-foreground mb-4">Profile Information</h3>
-            
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4">
+            <h3 className="text-lg font-medium text-zinc-100 mb-4">Profile Information</h3>
+
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-zinc-200 mb-1.5">Email</label>
               <input
                 type="email"
                 value={user.email}
                 disabled
-                className="w-full bg-muted border border-border rounded-lg py-2.5 px-4 text-sm text-muted-foreground"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 px-4 text-sm text-zinc-400"
               />
-              <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+              <p className="text-xs text-zinc-500 mt-1">Email cannot be changed</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Username</label>
+              <label className="block text-sm font-medium text-zinc-200 mb-1.5">Username</label>
               <div className="relative">
                 <input
                   type="text"
@@ -399,11 +399,11 @@ export default function Settings() {
                   disabled={isLoading}
                   minLength={3}
                   maxLength={30}
-                  className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                 />
-                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">3-30 characters</p>
+              <p className="text-xs text-zinc-500 mt-1">3-30 characters</p>
             </div>
           </div>
 
@@ -412,7 +412,7 @@ export default function Settings() {
             disabled={isLoading || !hasChanges}
             className="w-full py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {isLoading && <Loader2 size={18} className="animate-spin" />}
+            {isLoading && <InlineLoader />}
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
@@ -421,11 +421,11 @@ export default function Settings() {
       {/* History Tab */}
       {tab === 'history' && (
         <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-medium text-foreground">Watch History</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h3 className="text-lg font-medium text-zinc-100">Watch History</h3>
+                <p className="text-sm text-zinc-400 mt-1">
                   {historyTotal > 0 ? `${historyTotal} videos watched` : 'No watch history yet'}
                 </p>
               </div>
@@ -436,7 +436,7 @@ export default function Settings() {
                   className="flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {clearingHistory ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <InlineLoader />
                   ) : (
                     <Trash2 size={16} />
                   )}
@@ -461,23 +461,23 @@ export default function Settings() {
                     <VideoCard key={video.code} video={video} />
                   ))}
                 </div>
-                
+
                 {historyTotalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-6">
                     <button
                       onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                       disabled={historyPage <= 1 || historyLoading}
-                      className="px-4 py-2 rounded-lg bg-accent hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
+                      className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 text-sm cursor-pointer"
                     >
                       Previous
                     </button>
-                    <span className="px-4 py-2 text-muted-foreground text-sm">
+                    <span className="px-4 py-2 text-zinc-400 text-sm">
                       Page {historyPage} of {historyTotalPages}
                     </span>
                     <button
                       onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
                       disabled={historyPage >= historyTotalPages || historyLoading}
-                      className="px-4 py-2 rounded-lg bg-accent hover:bg-accent/80 disabled:opacity-50 disabled:cursor-not-allowed text-foreground text-sm cursor-pointer"
+                      className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 text-sm cursor-pointer"
                     >
                       Next
                     </button>
@@ -497,11 +497,11 @@ export default function Settings() {
 
       {/* Password Tab */}
       {tab === 'password' && (
-        <form onSubmit={handleUpdatePassword} className="bg-card border border-border rounded-lg p-6 space-y-4">
-          <h3 className="text-lg font-medium text-foreground mb-4">Change Password</h3>
-          
+        <form onSubmit={handleUpdatePassword} className="bg-zinc-900 border border-zinc-800 rounded-lg p-6 space-y-4">
+          <h3 className="text-lg font-medium text-zinc-100 mb-4">Change Password</h3>
+
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Current Password</label>
+            <label className="block text-sm font-medium text-zinc-200 mb-1.5">Current Password</label>
             <div className="relative">
               <input
                 type={showPasswords ? 'text' : 'password'}
@@ -510,14 +510,14 @@ export default function Settings() {
                 placeholder="Enter current password"
                 required
                 disabled={isLoading}
-                className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
               />
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">New Password</label>
+            <label className="block text-sm font-medium text-zinc-200 mb-1.5">New Password</label>
             <div className="relative">
               <input
                 type={showPasswords ? 'text' : 'password'}
@@ -527,14 +527,14 @@ export default function Settings() {
                 required
                 disabled={isLoading}
                 minLength={6}
-                className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
               />
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Confirm New Password</label>
+            <label className="block text-sm font-medium text-zinc-200 mb-1.5">Confirm New Password</label>
             <div className="relative">
               <input
                 type={showPasswords ? 'text' : 'password'}
@@ -544,13 +544,13 @@ export default function Settings() {
                 required
                 disabled={isLoading}
                 minLength={6}
-                className="w-full bg-input border border-border rounded-lg py-2.5 pl-10 pr-10 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
               />
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
               <button
                 type="button"
                 onClick={() => setShowPasswords(!showPasswords)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
               >
                 {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -562,7 +562,7 @@ export default function Settings() {
             disabled={isLoading}
             className="w-full py-2.5 bg-primary text-primary-foreground font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {isLoading && <Loader2 size={18} className="animate-spin" />}
+            {isLoading && <InlineLoader />}
             {isLoading ? 'Updating...' : 'Update Password'}
           </button>
         </form>
@@ -570,14 +570,14 @@ export default function Settings() {
 
       {/* Danger Zone Tab */}
       {tab === 'danger' && (
-        <div className="bg-card border border-destructive/30 rounded-lg p-6">
+        <div className="bg-zinc-900 border border-destructive/30 rounded-lg p-6">
           <h3 className="text-lg font-medium text-destructive mb-2">Delete Account</h3>
-          <p className="text-sm text-muted-foreground mb-6">
+          <p className="text-sm text-zinc-400 mb-6">
             This action is permanent and cannot be undone. All your data, including favorites and watch history, will be permanently deleted.
           </p>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-sm font-medium text-zinc-200 mb-1.5">
               Type <span className="font-mono text-destructive">DELETE</span> to confirm
             </label>
             <input
@@ -586,7 +586,7 @@ export default function Settings() {
               onChange={(e) => setDeleteConfirm(e.target.value)}
               placeholder="DELETE"
               disabled={isLoading}
-              className="w-full bg-input border border-border rounded-lg py-2.5 px-4 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-destructive disabled:opacity-50"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 px-4 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-destructive disabled:opacity-50"
             />
           </div>
 
@@ -595,7 +595,7 @@ export default function Settings() {
             disabled={isLoading || deleteConfirm !== 'DELETE'}
             className="w-full py-2.5 bg-destructive text-destructive-foreground font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {isLoading && <Loader2 size={18} className="animate-spin" />}
+            {isLoading && <InlineLoader />}
             <Trash2 size={18} />
             {isLoading ? 'Deleting...' : 'Delete My Account'}
           </button>

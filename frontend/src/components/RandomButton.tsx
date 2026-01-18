@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Dices } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useNeonColor } from '@/context/NeonColorContext';
+import { InlineLoader } from '@/components/Loading';
 
 const HISTORY_KEY = 'random_video_history';
 const MAX_HISTORY = 50;
@@ -72,7 +73,11 @@ export default function RandomButton() {
       }}
       title="Random Video"
     >
-      <Dices className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-12 transition-transform duration-300'}`} />
+      {loading ? (
+        <InlineLoader />
+      ) : (
+        <Dices className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+      )}
     </button>
   );
 }

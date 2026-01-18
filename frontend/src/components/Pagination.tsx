@@ -14,19 +14,19 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="p-2 rounded-lg border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 cursor-pointer"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
-      
-      <span className="px-4 py-2 text-sm text-muted-foreground">
+
+      <span className="px-4 py-2 text-sm text-zinc-400">
         Page {page} of {totalPages}
       </span>
-      
+
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="p-2 rounded-lg border border-border hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 cursor-pointer"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
