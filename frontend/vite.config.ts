@@ -7,7 +7,11 @@ import tailwindcss from '@tailwindcss/vite'
 const __filepath = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filepath);
 
+console.log("Vite Config - __dirname:", __dirname);
+console.log("Vite Config - cwd:", process.cwd());
+
 export default defineConfig({
+  root: __dirname,
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
