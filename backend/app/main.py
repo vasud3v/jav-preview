@@ -74,8 +74,24 @@ async def startup_event():
             print(f"✓ Connected to Supabase REST API")
         except Exception as e:
             print(f"⚠ Supabase connection warning: {e}")
-    
-    print(f"✓ API ready on http://0.0.0.0:{settings.port}")
+            
+    # Determine base URL for display
+    # Railway provides RAILWAY_PUBLIC_DOMAIN
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    if domain:
+        base_url = f"https://{domain}"
+    else:
+        # Fallback to local or manually provided
+        base_url = f"http://{settings.host}:{settings.port}"
+        if "jav-preview-production.up.railway.app" in settings.cors_origins:
+             base_url = "https://jav-preview-production.up.railway.app"
+
+    print("-" * 60)
+    print(f"🚀 Application is READY at: {base_url}")
+    print("-" * 60)
+    print(f"📱 Frontend:    {base_url}/")
+    print(f"📚 API Docs:    {base_url}/docs")
+    print(f"💓 Health:      {base_url}/api/health")
     print("=" * 60)
 
 
