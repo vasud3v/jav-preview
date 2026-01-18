@@ -1,6 +1,6 @@
 # Nixpacks configuration for Railway
 [phases.setup]
-nixPkgs = ["python311", "nodejs_20", "npm", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
+nixPkgs = ["python311", "nodejs_20", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
 
 [phases.install]
 cmds = [
