@@ -3,7 +3,7 @@ import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Volume1, Maximize, Minimize, Settings, SkipBack, SkipForward } from 'lucide-react';
 import { useNeonColor } from '@/context/NeonColorContext';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // HSL to Hex conversion
 function hslToHex(h: number, s: number, l: number): string {
@@ -13,14 +13,14 @@ function hslToHex(h: number, s: number, l: number): string {
   const x = c * (1 - Math.abs((h / 60) % 2 - 1));
   const m = l - c / 2;
   let r = 0, g = 0, b = 0;
-  
+
   if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
   else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
   else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
   else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
   else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
   else { r = c; g = 0; b = x; }
-  
+
   const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
@@ -46,25 +46,25 @@ function VideoLoader({ hsl }: { hsl: { h: number; s: number; l: number } }) {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-16 h-16">
       <defs>
         <filter id="vGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
         <filter id="vSoftGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.5" result="blur"/>
-          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          <feGaussianBlur stdDeviation="1.5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
         <linearGradient id="vLead" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.leadLight}/>
-          <stop offset="50%" stopColor={colors.lead}/>
-          <stop offset="100%" stopColor={colors.leadDark}/>
+          <stop offset="0%" stopColor={colors.leadLight} />
+          <stop offset="50%" stopColor={colors.lead} />
+          <stop offset="100%" stopColor={colors.leadDark} />
         </linearGradient>
         <linearGradient id="vMid" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.mid}/>
-          <stop offset="100%" stopColor={colors.lead}/>
+          <stop offset="0%" stopColor={colors.mid} />
+          <stop offset="100%" stopColor={colors.lead} />
         </linearGradient>
         <linearGradient id="vFade" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={colors.fade}/>
-          <stop offset="100%" stopColor={colors.mid}/>
+          <stop offset="0%" stopColor={colors.fade} />
+          <stop offset="100%" stopColor={colors.mid} />
         </linearGradient>
       </defs>
       <style>{`
@@ -72,24 +72,24 @@ function VideoLoader({ hsl }: { hsl: { h: number; s: number; l: number } }) {
         @keyframes vrotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
       <g className="vspinner">
-        <circle cx="50" cy="12" r="10" fill="#0a0a0a" filter="url(#vGlow)"/>
-        <circle cx="50" cy="12" r="6" fill="url(#vLead)" filter="url(#vGlow)"/>
-        <circle cx="50" cy="12" r="2.5" fill="#fff" opacity="0.7"/>
-        <circle cx="77" cy="23" r="8.5" fill="#0a0a0a" filter="url(#vSoftGlow)"/>
-        <circle cx="77" cy="23" r="5" fill="url(#vLead)" opacity="0.85" filter="url(#vSoftGlow)"/>
-        <circle cx="77" cy="23" r="2" fill="#fff" opacity="0.5"/>
-        <circle cx="88" cy="50" r="7" fill="#0a0a0a"/>
-        <circle cx="88" cy="50" r="4" fill="url(#vMid)" opacity="0.7"/>
-        <circle cx="77" cy="77" r="6" fill="#0a0a0a"/>
-        <circle cx="77" cy="77" r="3.5" fill="url(#vMid)" opacity="0.5"/>
-        <circle cx="50" cy="88" r="5" fill="#0a0a0a"/>
-        <circle cx="50" cy="88" r="3" fill="url(#vFade)" opacity="0.35"/>
-        <circle cx="23" cy="77" r="4.5" fill="#0a0a0a"/>
-        <circle cx="23" cy="77" r="2.5" fill={colors.fade} opacity="0.25"/>
-        <circle cx="12" cy="50" r="4" fill="#0a0a0a"/>
-        <circle cx="12" cy="50" r="2" fill={colors.faint} opacity="0.15"/>
-        <circle cx="23" cy="23" r="3.5" fill="#0a0a0a"/>
-        <circle cx="23" cy="23" r="1.5" fill={colors.faintest} opacity="0.1"/>
+        <circle cx="50" cy="12" r="10" fill="#0a0a0a" filter="url(#vGlow)" />
+        <circle cx="50" cy="12" r="6" fill="url(#vLead)" filter="url(#vGlow)" />
+        <circle cx="50" cy="12" r="2.5" fill="#fff" opacity="0.7" />
+        <circle cx="77" cy="23" r="8.5" fill="#0a0a0a" filter="url(#vSoftGlow)" />
+        <circle cx="77" cy="23" r="5" fill="url(#vLead)" opacity="0.85" filter="url(#vSoftGlow)" />
+        <circle cx="77" cy="23" r="2" fill="#fff" opacity="0.5" />
+        <circle cx="88" cy="50" r="7" fill="#0a0a0a" />
+        <circle cx="88" cy="50" r="4" fill="url(#vMid)" opacity="0.7" />
+        <circle cx="77" cy="77" r="6" fill="#0a0a0a" />
+        <circle cx="77" cy="77" r="3.5" fill="url(#vMid)" opacity="0.5" />
+        <circle cx="50" cy="88" r="5" fill="#0a0a0a" />
+        <circle cx="50" cy="88" r="3" fill="url(#vFade)" opacity="0.35" />
+        <circle cx="23" cy="77" r="4.5" fill="#0a0a0a" />
+        <circle cx="23" cy="77" r="2.5" fill={colors.fade} opacity="0.25" />
+        <circle cx="12" cy="50" r="4" fill="#0a0a0a" />
+        <circle cx="12" cy="50" r="2" fill={colors.faint} opacity="0.15" />
+        <circle cx="23" cy="23" r="3.5" fill="#0a0a0a" />
+        <circle cx="23" cy="23" r="1.5" fill={colors.faintest} opacity="0.1" />
       </g>
     </svg>
   );
@@ -130,7 +130,7 @@ function PreviewThumbnail({ source, time }: PreviewThumbnailProps) {
     if (!video || !source) return;
 
     const proxiedUrl = getProxiedUrl(source);
-    
+
     if (source.includes('.m3u8') && Hls.isSupported()) {
       if (hlsRef.current) {
         hlsRef.current.destroy();
@@ -170,11 +170,11 @@ function PreviewThumbnail({ source, time }: PreviewThumbnailProps) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !ready) return;
-    
+
     const timeKey = Math.floor(time * 2) / 2; // Round to 0.5s
     if (timeKey === lastTimeRef.current) return;
     lastTimeRef.current = timeKey;
-    
+
     video.currentTime = time;
   }, [time, ready]);
 
@@ -197,7 +197,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initializedUrlRef = useRef<string | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
-  
+
   const filteredSources = filterSources(sources);
   const primarySource = filteredSources[0] || '';
   const { color } = useNeonColor();
@@ -212,7 +212,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const [currentTime, setCurrentTime] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [volume, setVolume] = useState(1);
-  const [qualities, setQualities] = useState<{height: number, index: number}[]>([]);
+  const [qualities, setQualities] = useState<{ height: number, index: number }[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -296,15 +296,15 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const togglePlay = useCallback(() => { const v = videoRef.current; if (v) v.paused ? v.play().catch(() => {}) : v.pause(); }, []);
+  const togglePlay = useCallback(() => { const v = videoRef.current; if (v) v.paused ? v.play().catch(() => { }) : v.pause(); }, []);
   const toggleMute = useCallback(() => { const v = videoRef.current; if (v) { v.muted = !v.muted; setIsMuted(v.muted); } }, []);
   const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { const v = videoRef.current; if (!v) return; const vol = parseFloat(e.target.value); v.volume = vol; setVolume(vol); setIsMuted(vol === 0); v.muted = vol === 0; }, []);
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => { 
-    const v = videoRef.current; 
-    if (!v || !duration) return; 
-    const rect = e.currentTarget.getBoundingClientRect(); 
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const v = videoRef.current;
+    if (!v || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    v.currentTime = percent * duration; 
+    v.currentTime = percent * duration;
   }, [duration]);
 
   // Drag to seek handlers
@@ -350,14 +350,14 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const time = percent * duration;
-    setHoverTime(time); 
+    setHoverTime(time);
     setHoverPosition(e.clientX - rect.left);
   }, [duration]);
 
-  const handleProgressLeave = useCallback(() => { 
-    setHoverTime(null); 
+  const handleProgressLeave = useCallback(() => {
+    setHoverTime(null);
   }, []);
-  const toggleFullscreen = useCallback(() => { const c = containerRef.current; if (c) document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : c.requestFullscreen().catch(() => {}); }, []);
+  const toggleFullscreen = useCallback(() => { const c = containerRef.current; if (c) document.fullscreenElement ? document.exitFullscreen().catch(() => { }) : c.requestFullscreen().catch(() => { }); }, []);
   const handleMouseMove = useCallback(() => { setShowControls(true); if (hideControlsTimeout.current) clearTimeout(hideControlsTimeout.current); hideControlsTimeout.current = setTimeout(() => { if (isPlaying) setShowControls(false); }, 3000); }, [isPlaying]);
   const handleQualityChange = useCallback((i: number) => { if (hlsRef.current) { hlsRef.current.currentLevel = i; setCurrentQuality(i); } setShowQualityMenu(false); }, []);
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -397,7 +397,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       <div className="aspect-video bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center rounded-2xl relative overflow-hidden">
         {poster && <img src={poster} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md" />}
         <div className="text-center relative z-10">
-          <div 
+          <div
             className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center transition-all"
             style={{ background: `${color.hex}15`, boxShadow: `0 0 30px ${color.hex}20` }}
           >
@@ -410,11 +410,11 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   }
 
   return (
-    <div 
-      ref={containerRef} 
-      className="relative aspect-video bg-black rounded-2xl overflow-hidden group select-none" 
-      onMouseMove={handleMouseMove} 
-      onMouseLeave={() => isPlaying && setShowControls(false)} 
+    <div
+      ref={containerRef}
+      className="relative aspect-video bg-black rounded-2xl overflow-hidden group select-none"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => isPlaying && setShowControls(false)}
       tabIndex={0}
       style={{ boxShadow: `0 0 60px ${color.hex}10` }}
     >
@@ -451,9 +451,9 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       {/* Center play button */}
       {!isPlaying && !loading && !error && (
         <div className="absolute inset-0 flex items-center justify-center cursor-pointer z-10" onClick={togglePlay}>
-          <div 
+          <div
             className="w-18 h-18 rounded-full backdrop-blur-md flex items-center justify-center hover:scale-110 transition-all duration-300"
-            style={{ 
+            style={{
               background: `linear-gradient(135deg, ${color.hex}30, ${color.hex}10)`,
               boxShadow: `0 0 40px ${color.hex}30, inset 0 0 20px ${color.hex}10`
             }}
@@ -465,37 +465,37 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
 
       {/* Controls overlay */}
       <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/60 to-transparent pt-16 pb-3 px-4 transition-all duration-300 z-30 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-        
+
         {/* Progress bar */}
-        <div 
-          ref={progressBarRef} 
+        <div
+          ref={progressBarRef}
           className={`relative py-3 cursor-pointer group/progress ${isDragging ? 'cursor-grabbing' : ''}`}
           onMouseDown={handleDragStart}
-          onMouseMove={handleProgressHover} 
+          onMouseMove={handleProgressHover}
           onMouseLeave={handleProgressLeave}
         >
           {/* Preview thumbnail - always mounted for HLS persistence */}
-          <div 
-            className="absolute bottom-full mb-4 -translate-x-1/2 pointer-events-none z-50 transition-opacity duration-150" 
-            style={{ 
+          <div
+            className="absolute bottom-full mb-4 -translate-x-1/2 pointer-events-none z-50 transition-opacity duration-150"
+            style={{
               left: `clamp(95px, ${hoverPosition}px, calc(100% - 95px))`,
               opacity: hoverTime !== null && duration > 0 ? 1 : 0,
               visibility: hoverTime !== null && duration > 0 ? 'visible' : 'hidden',
             }}
           >
-            <div 
-              className="rounded-xl overflow-hidden shadow-2xl border border-white/10" 
+            <div
+              className="rounded-xl overflow-hidden shadow-2xl border border-white/10"
               style={{ boxShadow: `0 0 30px ${color.hex}30, 0 8px 32px rgba(0,0,0,0.6)` }}
             >
               {/* Video preview */}
               <div className="w-[180px] h-[102px] bg-zinc-900 overflow-hidden relative">
-                <PreviewThumbnail 
-                  source={primarySource} 
-                  time={hoverTime ?? 0} 
+                <PreviewThumbnail
+                  source={primarySource}
+                  time={hoverTime ?? 0}
                 />
               </div>
-              <div 
-                className="px-3 py-2 text-center backdrop-blur-sm" 
+              <div
+                className="px-3 py-2 text-center backdrop-blur-sm"
                 style={{ background: `linear-gradient(135deg, ${color.hex}15, rgba(24,24,27,0.95), ${color.hex}15)` }}
               >
                 <span className="text-white text-sm font-semibold tabular-nums tracking-wide">{formatTime(hoverTime ?? 0)}</span>
@@ -506,31 +506,31 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
           {/* Progress track */}
           <div className="relative flex items-center" style={{ height: '16px', minHeight: '16px', maxHeight: '16px' }}>
             {/* Background track */}
-            <div 
-              className="absolute w-full rounded-full transition-colors duration-300" 
-              style={{ backgroundColor: `${color.hex}12`, height: '3px' }} 
+            <div
+              className="absolute w-full rounded-full transition-colors duration-300"
+              style={{ backgroundColor: `${color.hex}12`, height: '3px' }}
             />
-            
+
             {/* Buffered indicator */}
-            <div 
-              className="absolute rounded-full transition-all duration-500 ease-out" 
-              style={{ 
-                width: `${Math.min(buffered, 100)}%`, 
+            <div
+              className="absolute rounded-full transition-all duration-500 ease-out"
+              style={{
+                width: `${Math.min(buffered, 100)}%`,
                 backgroundColor: `${color.hex}20`,
                 opacity: buffered > 0 ? 1 : 0,
                 height: '3px'
-              }} 
+              }}
             />
-            
+
             {/* Wave progress container */}
             {progress > 0 && (
-              <div 
+              <div
                 className="absolute inset-0"
-                style={{ 
+                style={{
                   clipPath: `inset(0 ${100 - Math.max(Math.min(progress, 100), 0.1)}% 0 0)`
                 }}
               >
-                <svg 
+                <svg
                   className="absolute left-0 top-1/2"
                   width="100%"
                   height="16"
@@ -540,54 +540,54 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 >
                   <defs>
                     <filter id="waveGlow" x="-20%" y="-50%" width="140%" height="200%">
-                      <feGaussianBlur stdDeviation="0.8" result="blur"/>
+                      <feGaussianBlur stdDeviation="0.8" result="blur" />
                       <feMerge>
-                        <feMergeNode in="blur"/>
-                        <feMergeNode in="SourceGraphic"/>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
                       </feMerge>
                     </filter>
                   </defs>
                   <path
                     d="M0,8 Q3,5 6,8 T12,8 T18,8 T24,8 T30,8 T36,8 T42,8 T48,8 T54,8 T60,8 T66,8 T72,8 T78,8 T84,8 T90,8 T96,8 T102,8 T108,8 T114,8 T120,8 T126,8 T132,8 T138,8 T144,8 T150,8 T156,8 T162,8 T168,8 T174,8 T180,8 T186,8 T192,8 T198,8 T204,8 T210,8 T216,8 T222,8 T228,8 T234,8 T240,8 T246,8 T252,8 T258,8 T264,8 T270,8 T276,8 T282,8 T288,8 T294,8 T300,8 T306,8 T312,8 T318,8 T324,8 T330,8 T336,8 T342,8 T348,8 T354,8 T360,8 T366,8 T372,8 T378,8 T384,8 T390,8 T396,8 T402,8 T408,8 T414,8 T420,8 T426,8 T432,8 T438,8 T444,8 T450,8 T456,8 T462,8 T468,8 T474,8 T480,8 T486,8 T492,8 T498,8 T504,8 T510,8 T516,8 T522,8 T528,8 T534,8 T540,8 T546,8 T552,8 T558,8 T564,8 T570,8 T576,8 T582,8 T588,8 T594,8 T600,8 T606,8 T612,8 T618,8 T624,8 T630,8 T636,8 T642,8 T648,8 T654,8 T660,8 T666,8 T672,8 T678,8 T684,8 T690,8 T696,8 T702,8 T708,8 T714,8 T720,8 T726,8 T732,8 T738,8 T744,8 T750,8 T756,8 T762,8 T768,8 T774,8 T780,8 T786,8 T792,8 T798,8 T804,8 T810,8 T816,8 T822,8 T828,8 T834,8 T840,8 T846,8 T852,8 T858,8 T864,8 T870,8 T876,8 T882,8 T888,8 T894,8 T900,8 T906,8 T912,8 T918,8 T924,8 T930,8 T936,8 T942,8 T948,8 T954,8 T960,8 T966,8 T972,8 T978,8 T984,8 T990,8 T996,8 T1002,8 T1008,8 T1014,8 T1020,8 T1026,8 T1032,8 T1038,8 T1044,8 T1050,8 T1056,8 T1062,8 T1068,8 T1074,8 T1080,8 T1086,8 T1092,8 T1098,8 T1104,8 T1110,8 T1116,8 T1122,8 T1128,8 T1134,8 T1140,8 T1146,8 T1152,8 T1158,8 T1164,8 T1170,8 T1176,8 T1182,8 T1188,8 T1194,8 T1200,8"
-                    fill="none" 
+                    fill="none"
                     stroke={color.hex}
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    filter="url(#waveGlow)" 
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    filter="url(#waveGlow)"
                     className={isPlaying ? 'wave-path' : ''}
                     vectorEffect="non-scaling-stroke"
                   />
                 </svg>
               </div>
             )}
-            
+
             {/* Progress head - always visible when there's progress */}
             {progress > 0.5 && (
-              <div 
+              <div
                 className="absolute top-1/2 w-[10px] h-[10px] rounded-full transition-all duration-100 pointer-events-none z-10"
-                style={{ 
-                  left: `${Math.min(progress, 99.5)}%`, 
+                style={{
+                  left: `${Math.min(progress, 99.5)}%`,
                   transform: 'translate(-50%, -50%)',
                   backgroundColor: color.hex,
                   boxShadow: `0 0 12px ${color.hex}, 0 0 24px ${color.hex}50`,
                   opacity: showControls ? 1 : 0.7
-                }} 
+                }}
               />
             )}
-            
+
             {/* Hover indicator line */}
             {hoverTime !== null && duration > 0 && (
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-[2px] h-5 rounded-full transition-all duration-75 pointer-events-none" 
-                style={{ 
-                  left: `${Math.max(0, Math.min((hoverTime / duration) * 100, 100))}%`, 
-                  backgroundColor: color.hex, 
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-[2px] h-5 rounded-full transition-all duration-75 pointer-events-none"
+                style={{
+                  left: `${Math.max(0, Math.min((hoverTime / duration) * 100, 100))}%`,
+                  backgroundColor: color.hex,
                   boxShadow: `0 0 8px ${color.hex}`,
                   opacity: 0.9
-                }} 
+                }}
               />
             )}
-            
+
             {/* Clickable area expansion for easier interaction */}
             <div className="absolute inset-0 -top-2 -bottom-2" />
           </div>
@@ -597,39 +597,39 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
         <div className="flex items-center justify-between gap-3 mt-2">
           <div className="flex items-center gap-0.5">
             {/* Skip back 3s */}
-            <button 
-              onClick={() => skip(-3)} 
+            <button
+              onClick={() => skip(-3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
             >
               <SkipBack className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
-            
+
             {/* Play/Pause */}
-            <button 
-              onClick={togglePlay} 
+            <button
+              onClick={togglePlay}
               className="p-2.5 rounded-full transition-all cursor-pointer group/btn"
-              style={{ 
+              style={{
                 background: isPlaying ? `${color.hex}15` : `${color.hex}15`,
               }}
             >
               {isPlaying ? (
-                <Pause 
-                  className="w-5 h-5 group-hover/btn:scale-110 transition-transform" 
+                <Pause
+                  className="w-5 h-5 group-hover/btn:scale-110 transition-transform"
                   style={{ color: color.hex }}
                 />
               ) : (
                 <Play className="w-5 h-5 group-hover/btn:scale-110 transition-transform" style={{ color: color.hex }} />
               )}
             </button>
-            
+
             {/* Skip forward 3s */}
-            <button 
-              onClick={() => skip(3)} 
+            <button
+              onClick={() => skip(3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
             >
               <SkipForward className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
-            
+
             {/* Volume */}
             <div className="flex items-center group/volume ml-2">
               <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer">
@@ -638,25 +638,25 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 ease-out">
                 <div className="relative w-24 h-6 flex items-center px-1">
                   <div className="absolute w-full h-1 bg-white/20 rounded-full" />
-                  <div 
+                  <div
                     className="absolute h-1 rounded-full transition-all"
-                    style={{ 
+                    style={{
                       width: `${(isMuted ? 0 : volume) * 100}%`,
                       backgroundColor: color.hex,
                       boxShadow: `0 0 8px ${color.hex}50`
                     }}
                   />
-                  <input 
+                  <input
                     type="range" min="0" max="1" step="0.02" value={isMuted ? 0 : volume} onChange={handleVolumeChange}
                     className="absolute w-full h-6 cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
                   />
                 </div>
               </div>
             </div>
-            
+
             {/* Time */}
             <div className="ml-3 flex items-center gap-1.5">
-              <span 
+              <span
                 className="text-sm font-medium tabular-nums"
                 style={{ color: color.hex }}
               >
@@ -670,11 +670,11 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
           <div className="flex items-center gap-1">
             {/* Speed */}
             <div className="relative" onClick={e => e.stopPropagation()}>
-              <button 
-                onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowQualityMenu(false); }} 
+              <button
+                onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowQualityMenu(false); }}
                 className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2"
               >
-                <span 
+                <span
                   className="text-sm font-semibold tabular-nums"
                   style={{ color: playbackSpeed !== 1 ? color.hex : 'white' }}
                 >
@@ -684,9 +684,9 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               {showSpeedMenu && (
                 <div className="absolute bottom-full right-0 mb-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl overflow-hidden shadow-2xl border border-white/5 z-50 min-w-[100px]">
                   {speedOptions.map(speed => (
-                    <button 
-                      key={speed} 
-                      onClick={() => handleSpeedChange(speed)} 
+                    <button
+                      key={speed}
+                      onClick={() => handleSpeedChange(speed)}
                       className={`w-full px-4 py-2 text-xs hover:bg-white/5 cursor-pointer transition-colors flex items-center justify-between ${playbackSpeed === speed ? '' : 'text-white/50'}`}
                       style={playbackSpeed === speed ? { color: color.hex } : {}}
                     >
@@ -697,12 +697,12 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 </div>
               )}
             </div>
-            
+
             {/* Quality */}
             {qualities.length > 1 && (
               <div className="relative" onClick={e => e.stopPropagation()}>
-                <button 
-                  onClick={() => { setShowQualityMenu(!showQualityMenu); setShowSpeedMenu(false); }} 
+                <button
+                  onClick={() => { setShowQualityMenu(!showQualityMenu); setShowSpeedMenu(false); }}
                   className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Settings className="w-4 h-4 text-white/80" />
@@ -710,8 +710,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 </button>
                 {showQualityMenu && (
                   <div className="absolute bottom-full right-0 mb-2 bg-zinc-900/98 backdrop-blur-xl rounded-xl overflow-hidden min-w-[100px] shadow-2xl border border-white/5 z-50">
-                    <button 
-                      onClick={() => handleQualityChange(-1)} 
+                    <button
+                      onClick={() => handleQualityChange(-1)}
                       className={`w-full px-4 py-2 text-left text-xs hover:bg-white/5 cursor-pointer transition-colors flex items-center justify-between ${currentQuality === -1 ? '' : 'text-white/50'}`}
                       style={currentQuality === -1 ? { color: color.hex } : {}}
                     >
@@ -719,9 +719,9 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                       {currentQuality === -1 && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color.hex }} />}
                     </button>
                     {qualities.map(q => (
-                      <button 
-                        key={q.index} 
-                        onClick={() => handleQualityChange(q.index)} 
+                      <button
+                        key={q.index}
+                        onClick={() => handleQualityChange(q.index)}
                         className={`w-full px-4 py-2 text-left text-xs hover:bg-white/5 cursor-pointer transition-colors flex items-center justify-between ${currentQuality === q.index ? '' : 'text-white/50'}`}
                         style={currentQuality === q.index ? { color: color.hex } : {}}
                       >
@@ -733,10 +733,10 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 )}
               </div>
             )}
-            
+
             {/* Fullscreen */}
-            <button 
-              onClick={toggleFullscreen} 
+            <button
+              onClick={toggleFullscreen}
               className="p-2.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer group/btn ml-1"
             >
               {isFullscreen ? (

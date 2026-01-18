@@ -2,7 +2,7 @@
  * API client for backend communication with caching
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // ============================================
 // Simple In-Memory Cache
@@ -20,13 +20,13 @@ class ApiCache {
   get<T>(key: string): T | null {
     const entry = this.cache.get(key) as CacheEntry<T> | undefined;
     if (!entry) return null;
-    
+
     // Check if expired
     if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return entry.data;
   }
 
@@ -36,7 +36,7 @@ class ApiCache {
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) this.cache.delete(oldestKey);
     }
-    
+
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -165,29 +165,29 @@ export interface Comment {
 
 // Cached fetch helper
 async function fetchWithCache<T>(
-  endpoint: string, 
+  endpoint: string,
   ttl: number,
   cacheKey?: string
 ): Promise<T> {
   const key = cacheKey || endpoint;
-  
+
   // Check cache first
   const cached = cache.get<T>(key);
   if (cached !== null) {
     return cached;
   }
-  
+
   // Fetch from API
   const res = await fetch(`${API_BASE}${endpoint}`);
   if (!res.ok) {
     throw new Error(`API error: ${res.status}`);
   }
-  
+
   const data = await res.json();
-  
+
   // Cache the result
   cache.set(key, data, ttl);
-  
+
   return data;
 }
 
@@ -237,7 +237,7 @@ export const api = {
     if (params.sortOrder) searchParams.set('sort_order', params.sortOrder);
     searchParams.set('page', (params.page || 1).toString());
     searchParams.set('page_size', (params.pageSize || 20).toString());
-    
+
     const queryString = searchParams.toString();
     return fetchWithCache<PaginatedResponse<VideoListItem>>(
       `/videos/search/advanced?${queryString}`,
@@ -272,7 +272,7 @@ export const api = {
     }>(`/videos/search/facets${params}`, TTL.SEARCH, `facets:${query || ''}`);
   },
 
-  getVideo: (code: string) => 
+  getVideo: (code: string) =>
     fetchWithCache<VideoDetail>(
       `/videos/${encodeURIComponent(code)}`,
       TTL.VIDEO_DETAIL,
@@ -322,8 +322,8 @@ export const api = {
   },
 
   getRandomVideoCode: async (exclude: string[] = []) => {
-    const params = exclude.length > 0 
-      ? `?exclude=${encodeURIComponent(exclude.join(','))}` 
+    const params = exclude.length > 0
+      ? `?exclude=${encodeURIComponent(exclude.join(','))}`
       : '';
     const res = await fetch(`${API_BASE}/videos/random${params}`);
     if (!res.ok) throw new Error('Failed to get random video');
@@ -374,7 +374,7 @@ export const api = {
     ),
 
   // Categories
-  getCategories: () => 
+  getCategories: () =>
     fetchWithCache<Category[]>('/categories', TTL.CATEGORIES),
 
   getVideosByCategory: (category: string, page = 1, pageSize = 20) =>
@@ -385,7 +385,7 @@ export const api = {
     ),
 
   // Studios
-  getStudios: () => 
+  getStudios: () =>
     fetchWithCache<Studio[]>('/studios', TTL.STUDIOS),
 
   getVideosByStudio: (studio: string, page = 1, pageSize = 20) =>
@@ -396,7 +396,7 @@ export const api = {
     ),
 
   // Series
-  getSeries: () => 
+  getSeries: () =>
     fetchWithCache<{ name: string; count: number }[]>('/series', TTL.STUDIOS),
 
   getVideosBySeries: (series: string, page = 1, pageSize = 20) =>
@@ -407,13 +407,13 @@ export const api = {
     ),
 
   // Cast
-  getCast: () => 
+  getCast: () =>
     fetchWithCache<CastMember[]>('/cast', TTL.CAST),
 
   getAllCastWithImages: () =>
     fetchWithCache<CastWithImage[]>('/cast/all', TTL.CAST, 'cast:all'),
 
-  getFeaturedCast: (limit = 20) => 
+  getFeaturedCast: (limit = 20) =>
     fetchWithCache<CastWithImage[]>(
       `/cast/featured?limit=${limit}`,
       TTL.CAST,
@@ -429,8 +429,8 @@ export const api = {
 
   // Increment view count (no caching, invalidates video cache)
   incrementView: async (code: string) => {
-    const res = await fetch(`${API_BASE}/videos/${encodeURIComponent(code)}/view`, { 
-      method: 'POST' 
+    const res = await fetch(`${API_BASE}/videos/${encodeURIComponent(code)}/view`, {
+      method: 'POST'
     });
     // Invalidate this video's cache
     cache.invalidate(`video:${code.toUpperCase()}`);

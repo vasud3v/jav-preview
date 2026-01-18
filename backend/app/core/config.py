@@ -34,9 +34,19 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         """Return CORS origins as a list."""
-        if not self.cors_origins:
-            return ["http://localhost:5173", "http://localhost:3000"]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins = []
+        if self.cors_origins:
+            origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        else:
+            origins = ["http://localhost:5173", "http://localhost:3000"]
+            
+        # Automatically add Railway domain if present
+        import os
+        railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        if railway_domain:
+             origins.append(f"https://{railway_domain}")
+             
+        return origins
     
     # Pagination
     default_page_size: int = 20

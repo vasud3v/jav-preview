@@ -2,7 +2,7 @@
  * Authentication API client and state management
  */
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // Types
 export interface User {
@@ -137,7 +137,7 @@ export const authApi = {
     const cleanData: Record<string, string> = {};
     if (data.username !== undefined) cleanData.username = data.username;
     if (data.avatar_url !== undefined) cleanData.avatar_url = data.avatar_url;
-    
+
     const user = await authFetch<User>('/auth/profile', {
       method: 'PATCH',
       body: JSON.stringify(cleanData),
@@ -165,20 +165,20 @@ export const authApi = {
     }
 
     const data = await res.json();
-    
+
     // Update stored user
     const user = tokenStorage.getUser();
     if (user) {
       user.avatar_url = data.avatar_url;
       tokenStorage.setUser(user);
     }
-    
+
     return data;
   },
 
   deleteAvatar: async (): Promise<void> => {
     await authFetch('/upload/avatar', { method: 'DELETE' });
-    
+
     // Update stored user
     const user = tokenStorage.getUser();
     if (user) {
