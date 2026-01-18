@@ -30,10 +30,7 @@ async def health_check():
     return {"status": "healthy", "version": settings.api_version}
 
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {"message": "Prevue API", "version": settings.api_version}
+
 
 
 @app.exception_handler(Exception)

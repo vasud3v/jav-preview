@@ -1,3 +1,4 @@
+# Nixpacks configuration for Railway
 [phases.setup]
 nixPkgs = ["python311", "nodejs_20", "npm", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
 
@@ -5,12 +6,12 @@ nixPkgs = ["python311", "nodejs_20", "npm", "gcc", "gnumake", "libffi", "openssl
 cmds = [
     "python -m pip install --upgrade pip",
     "python -m pip install -r requirements.txt",
-    "cd frontend && npm install"
+    "cd frontend && npm install --include=dev"
 ]
 
 [phases.build]
 cmds = [
-    "cd frontend && CI=false npm run build"
+    "cd frontend && npm run build"
 ]
 
 [start]
