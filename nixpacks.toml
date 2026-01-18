@@ -1,6 +1,6 @@
 # Nixpacks configuration for Railway
 [variables]
-NIX_CONFIG = "download-buffer-size = 536870912" # 512MB
+NIX_CONFIG = "download-buffer-size = 1073741824" # 1GB
 
 [phases.setup]
 nixPkgs = ["python3", "nodejs_22", "curl", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]

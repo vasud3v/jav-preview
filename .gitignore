@@ -70,7 +70,7 @@ yarn-error.log*
 scraper/downloaded_files/
 
 # Debug files
-*.html
+
 debug_*.html
 
 # Supabase CLI
