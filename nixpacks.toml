@@ -3,7 +3,7 @@
 NIX_CONFIG = "download-buffer-size = 536870912" # 512MB
 
 [phases.setup]
-nixPkgs = ["python3", "nodejs_20", "curl", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
+nixPkgs = ["python3", "nodejs_22", "curl", "gcc", "gnumake", "libffi", "openssl", "pkg-config", "cargo", "rustc"]
 
 [phases.install]
 cmds = [
