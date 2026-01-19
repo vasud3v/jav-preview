@@ -1,33 +1,41 @@
 <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Rounded square frame (common in adult sites) -->
-  <rect x="2" y="2" width="36" height="36" rx="8" stroke="currentColor" stroke-width="1.5" fill="none"/>
+  <defs>
+    <!-- Gradient definitions -->
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff0080;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff6b35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f7931e;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7b2cbf;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#c77dff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0aaff;stop-opacity:1" />
+    </linearGradient>
+    
+    <radialGradient id="grad3">
+      <stop offset="0%" style="stop-color:#ff006e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8338ec;stop-opacity:1" />
+    </radialGradient>
+  </defs>
   
-  <!-- Stylized play button with curves -->
-  <path 
-    d="M14 10 C14 10, 14 30, 14 30 C14 30, 30 20, 30 20 C30 20, 14 10, 14 10 Z" 
-    fill="currentColor"
-  />
+  <!-- Colorful hexagon background -->
+  <path d="M20 2 L36 11 L36 29 L20 38 L4 29 L4 11 Z" fill="url(#grad1)"/>
   
-  <!-- Accent curves suggesting sensuality -->
-  <path 
-    d="M8 12 Q12 8, 16 8" 
-    stroke="currentColor" 
-    stroke-width="1" 
-    opacity="0.4"
-    fill="none"
-  />
-  <path 
-    d="M24 32 Q28 32, 32 28" 
-    stroke="currentColor" 
-    stroke-width="1" 
-    opacity="0.4"
-    fill="none"
-  />
+  <!-- Inner decorative hexagon -->
+  <path d="M20 6 L32 13 L32 27 L20 34 L8 27 L8 13 Z" fill="url(#grad2)" opacity="0.7"/>
   
-  <!-- Small heart accent (common in JAV branding) -->
-  <path 
-    d="M34 8 C34 8, 35 6, 36 7 C37 8, 36 9, 35 10 C34 11, 33 10, 33 9 C33 8, 34 7, 34 8 Z" 
-    fill="currentColor"
-    opacity="0.5"
-  />
+  <!-- Central play button with gradient -->
+  <circle cx="20" cy="20" r="10" fill="url(#grad3)"/>
+  <path d="M16 13 L16 27 L28 20 Z" fill="white"/>
+  
+  <!-- Colorful accent dots -->
+  <circle cx="10" cy="10" r="2" fill="#ff006e"/>
+  <circle cx="30" cy="10" r="2" fill="#ffbe0b"/>
+  <circle cx="10" cy="30" r="2" fill="#3a86ff"/>
+  <circle cx="30" cy="30" r="2" fill="#8338ec"/>
+  
+  <!-- Sparkle effects -->
+  <path d="M35 5 L36 7 L38 6 L37 8 L39 9 L37 10 L38 12 L36 11 L35 13 L34 11 L32 12 L33 10 L31 9 L33 8 L32 6 L34 7 Z" fill="#ffbe0b" opacity="0.8"/>
+  <path d="M5 35 L6 37 L8 36 L7 38 L9 39 L7 40 L8 42 L6 41 L5 43 L4 41 L2 42 L3 40 L1 39 L3 38 L2 36 L4 37 Z" fill="#ff006e" opacity="0.8"/>
 </svg>
