@@ -446,7 +446,7 @@ export default function Settings() {
             </div>
 
             {historyLoading ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="space-y-2 animate-pulse">
                     <div className="aspect-[3/4] bg-muted rounded-lg" />
@@ -456,7 +456,7 @@ export default function Settings() {
               </div>
             ) : watchHistory.length > 0 ? (
               <>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {watchHistory.map((video) => (
                     <VideoCard key={video.code} video={video} />
                   ))}

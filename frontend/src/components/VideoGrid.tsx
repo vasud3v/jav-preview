@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { VideoListItem } from '@/lib/api';
 import VideoCard from './VideoCard';
 import { VideoGridSkeleton } from './Skeleton';
@@ -6,9 +7,10 @@ interface VideoGridProps {
   videos: VideoListItem[];
   loading?: boolean;
   onVideoClick?: (code: string) => void;
+  columns?: 'auto' | 4 | 5 | 6 | 7;
 }
 
-export default function VideoGrid({ videos, loading, onVideoClick }: VideoGridProps) {
+const VideoGrid = memo(function VideoGrid({ videos, loading, onVideoClick, columns = 'auto' }: VideoGridProps) {
   if (loading) {
     return <VideoGridSkeleton />;
   }
@@ -21,11 +23,22 @@ export default function VideoGrid({ videos, loading, onVideoClick }: VideoGridPr
     );
   }
 
+  // Grid configurations matching javtrailers.com style
+  const gridClasses = {
+    'auto': 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 2xl:grid-cols-11 gap-3',
+    4: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4',
+    5: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-4',
+    6: 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4',
+    7: 'grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3'
+  };
+
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3">
+    <div className={gridClasses[columns]}>
       {videos.map((video) => (
         <VideoCard key={video.code} video={video} onClick={onVideoClick} />
       ))}
     </div>
   );
-}
+});
+
+export default VideoGrid;

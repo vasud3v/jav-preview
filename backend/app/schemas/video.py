@@ -61,6 +61,3 @@ class HomeFeedResponse(BaseModel):
     top_rated: List[VideoListItem]
     new_releases: List[VideoListItem]
     classics: List[VideoListItem]
-    top_rated: List[VideoListItem]
-    new_releases: List[VideoListItem]
-    classics: List[VideoListItem]

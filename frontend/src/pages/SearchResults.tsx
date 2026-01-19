@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { VideoListItem } from '@/lib/api';
-import VideoCard from '@/components/VideoCard';
+import VideoGrid from '@/components/VideoGrid';
 import Loading from '@/components/Loading';
 
 interface SearchFilters {
@@ -581,11 +581,7 @@ export default function SearchResults() {
       {/* Results Grid */}
       {!loading && videos.length > 0 && (
         <>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
-            {videos.map((video) => (
-              <VideoCard key={video.code} video={video} />
-            ))}
-          </div>
+          <VideoGrid videos={videos} columns={6} />
 
           {/* Pagination */}
           {totalPages > 1 && (

@@ -368,11 +368,8 @@ async def get_related_videos(
     """Get personalized video recommendations based on content, watch history, and user preferences."""
     # Simplified for REST API - return popular videos
     result = await video_service.get_popular_videos(1, limit)
-    return {
-        "items": [item.model_dump() for item in result.items],
-        "strategy": strategy,
-        "source_video": code
-    }
+    # Return array directly to match frontend expectations
+    return [item.model_dump() for item in result.items]
 
 
 @router.post("/{code}/view")

@@ -3,7 +3,7 @@ import { Heart } from 'lucide-react';
 import { api, type VideoListItem } from '@/lib/api';
 import { getUserId } from '@/lib/user';
 import { useNeonColor } from '@/context/NeonColorContext';
-import VideoCard from '@/components/VideoCard';
+import VideoGrid from '@/components/VideoGrid';
 
 export default function LikedVideos() {
   const { color } = useNeonColor();
@@ -79,11 +79,7 @@ export default function LikedVideos() {
         {/* Video Grid */}
         {!loading && videos.length > 0 && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {videos.map((video) => (
-                <VideoCard key={video.code} video={video} />
-              ))}
-            </div>
+            <VideoGrid videos={videos} columns={6} />
 
             {/* Pagination */}
             {totalPages > 1 && (

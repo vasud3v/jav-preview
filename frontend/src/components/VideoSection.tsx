@@ -149,7 +149,7 @@ export default function VideoSection({
           {videos.map((video, index) => (
             <div
               key={video.code}
-              className="flex-shrink-0 w-[110px] sm:w-[130px] md:w-[140px] lg:w-[150px] xl:w-[160px] transition-all duration-300 hover:scale-[1.02]"
+              className="flex-shrink-0 w-[120px] sm:w-[130px] md:w-[135px] lg:w-[140px] xl:w-[145px] transition-all duration-300 hover:scale-[1.02]"
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <VideoCard video={video} onClick={onVideoClick} highlightColor={highlightColor} />

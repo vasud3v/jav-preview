@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, Calendar, Building2, Film, X, ChevronLeft, ChevronRight, ChevronDown, Copy, Check, Images, ZoomIn, ZoomOut, RotateCw, Download, Play, Pause, Grid3X3, Star, Bookmark, Heart } from 'lucide-react';
+import { ArrowLeft, Eye, Calendar, Building2, Film, X, ChevronLeft, ChevronRight, ChevronDown, Copy, Check, Images, ZoomIn, ZoomOut, RotateCw, Download, Play, Pause, Grid3X3, Star, Bookmark } from 'lucide-react';
 import { api, proxyImageUrl } from '@/lib/api';
 import { getAnonymousUserId } from '@/lib/user';
 import { useAuth } from '@/context/AuthContext';
 import { useNeonColor } from '@/context/NeonColorContext';
 import type { VideoDetail as VideoDetailType, VideoListItem } from '@/lib/api';
 import VideoPlayer from '@/components/VideoPlayer';
-import VideoCard from '@/components/VideoCard';
+import VideoGrid from '@/components/VideoGrid';
 import CommentSection from '@/components/CommentSection';
 import Loading from '@/components/Loading';
 import LikeButtonStyled from '@/components/LikeButtonStyled';
@@ -173,7 +173,7 @@ export default function VideoDetail() {
         const result = await api.setRating(code, userId, newRating);
         setRating(result);
       }
-      
+
       // Invalidate home feed cache to refresh top rated section
       const { invalidateCache } = await import('@/hooks/useApi');
       invalidateCache('home:feed');
@@ -324,15 +324,15 @@ export default function VideoDetail() {
             <div className="flex items-center gap-2 shrink-0">
               {/* Like Button */}
               <LikeButtonStyled videoCode={video.code} />
-              
+
               {/* Bookmark Button */}
               <div className="relative">
                 <button
                   onClick={handleBookmark}
                   disabled={bookmarkLoading}
                   className={`p-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50 ${bookmarked
-                      ? 'bg-opacity-10'
-                      : 'text-white/40 hover:bg-white/5'
+                    ? 'bg-opacity-10'
+                    : 'text-white/40 hover:bg-white/5'
                     }`}
                   style={bookmarked ? { color: color.hex, backgroundColor: `rgba(${color.rgb}, 0.1)` } : {}}
                   title={user ? (bookmarked ? 'Remove bookmark' : 'Add bookmark') : 'Login to bookmark'}
@@ -510,8 +510,8 @@ export default function VideoDetail() {
           <div className="mt-8 pt-6 border-t border-white/5">
             <h2 className="text-sm font-medium text-white/70 mb-4">You may also like</h2>
             {relatedLoading ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                {Array.from({ length: 6 }).map((_, i) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i} className="space-y-2 animate-pulse">
                     <div className="aspect-[3/4] bg-white/5 rounded-lg" />
                     <div className="h-3 bg-white/5 rounded w-3/4" />
@@ -519,11 +519,7 @@ export default function VideoDetail() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                {relatedVideos.map((relatedVideo) => (
-                  <VideoCard key={relatedVideo.code} video={relatedVideo} />
-                ))}
-              </div>
+              <VideoGrid videos={relatedVideos} columns={6} />
             )}
           </div>
         )}
@@ -539,16 +535,14 @@ export default function VideoDetail() {
             </div>
 
             {discoverVideos.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-6">
-                {discoverVideos.map((discoverVideo) => (
-                  <VideoCard key={discoverVideo.code} video={discoverVideo} />
-                ))}
+              <div className="mb-6">
+                <VideoGrid videos={discoverVideos} columns={6} />
               </div>
             )}
 
             {discoverLoading && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 mb-6">
-                {Array.from({ length: 6 }).map((_, i) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-6">
+                {Array.from({ length: 12 }).map((_, i) => (
                   <div key={i} className="space-y-2 animate-pulse">
                     <div className="aspect-[3/4] bg-white/5 rounded-lg" />
                     <div className="h-3 bg-white/5 rounded w-3/4" />
@@ -809,8 +803,8 @@ export default function VideoDetail() {
                       key={i}
                       onClick={() => goToImage(i)}
                       className={`flex-shrink-0 overflow-hidden transition-all duration-200 cursor-pointer ${i === currentImage
-                          ? 'w-16 h-10 rounded border-2 border-white opacity-100'
-                          : 'w-12 h-8 rounded border border-white/20 opacity-40 hover:opacity-70 hover:border-white/40'
+                        ? 'w-16 h-10 rounded border-2 border-white opacity-100'
+                        : 'w-12 h-8 rounded border border-white/20 opacity-40 hover:opacity-70 hover:border-white/40'
                         }`}
                     >
                       <img

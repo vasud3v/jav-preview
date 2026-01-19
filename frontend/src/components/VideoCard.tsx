@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, Eye, Star, Film } from 'lucide-react';
 import { useNeonColor } from '@/context/NeonColorContext';
@@ -9,13 +9,13 @@ import LikeButton from './LikeButton';
 interface VideoCardProps {
   video: VideoListItem;
   onClick?: (code: string) => void;
-  highlightColor?: string; // Optional neon highlight color
+  highlightColor?: string;
 }
 
 // Known placeholder image patterns from source sites
 const PLACEHOLDER_PATTERNS = [
   'nowprinting',
-  'now_printing', 
+  'now_printing',
   'noimage',
   'no_image',
   'placeholder',
@@ -29,59 +29,72 @@ const isPlaceholderImage = (url: string | null | undefined): boolean => {
   return PLACEHOLDER_PATTERNS.some(pattern => lowerUrl.includes(pattern));
 };
 
-export default function VideoCard({ video, onClick, highlightColor }: VideoCardProps) {
+// Memoized formatters outside component to avoid recreation
+const formatViews = (num: number): string => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+};
+
+const formatDate = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
+const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
   const { color } = useNeonColor();
-  
-  const hasValidThumbnail = video.thumbnail_url && !isPlaceholderImage(video.thumbnail_url) && !imageError;
-  
-  const formatViews = (num: number) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  // Memoize computed values
+  const hasValidThumbnail = useMemo(
+    () => video.thumbnail_url && !isPlaceholderImage(video.thumbnail_url) && !imageError,
+    [video.thumbnail_url, imageError]
+  );
 
-  const handleClick = () => {
+  const thumbnailUrl = useMemo(
+    () => hasValidThumbnail ? proxyImageUrl(video.thumbnail_url) : null,
+    [hasValidThumbnail, video.thumbnail_url]
+  );
+
+  const formattedViews = useMemo(() => formatViews(video.views || 0), [video.views]);
+  const formattedDate = useMemo(
+    () => video.release_date ? formatDate(video.release_date) : null,
+    [video.release_date]
+  );
+
+  // Memoize callbacks
+  const handleClick = useCallback(() => {
     if (onClick) {
       onClick(video.code);
     } else {
       navigate(`/video/${encodeURIComponent(video.code)}`);
     }
-  };
+  }, [onClick, video.code, navigate]);
+
+  const handleImageError = useCallback(() => setImageError(true), []);
 
   return (
-    <div
-      className="group cursor-pointer"
-      onClick={handleClick}
-    >
+    <div className="group cursor-pointer" onClick={handleClick}>
       {/* Thumbnail */}
-      <div className="relative rounded-lg overflow-hidden mb-2">
-        {hasValidThumbnail ? (
+      <div className="relative rounded-lg overflow-hidden mb-2 bg-muted aspect-[2/3]">
+        {thumbnailUrl ? (
           <img
-            src={proxyImageUrl(video.thumbnail_url)}
+            src={thumbnailUrl}
             alt={video.title}
-            className="w-full h-auto block"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
-            onError={() => setImageError(true)}
+            decoding="async"
+            onError={handleImageError}
           />
         ) : (
-          <div className="aspect-video bg-muted flex flex-col items-center justify-center gap-2">
-            <Film className="w-10 h-10 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground font-medium">Coming Soon</span>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <Film className="w-8 h-8 text-muted-foreground/50" />
+            <span className="text-[10px] text-muted-foreground font-medium">No Image</span>
           </div>
         )}
 
@@ -92,13 +105,13 @@ export default function VideoCard({ video, onClick, highlightColor }: VideoCardP
           </div>
         </div>
 
-        {/* Views badge - glass - top left */}
+        {/* Views badge */}
         <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
           <Eye className="w-3 h-3" />
-          {formatViews(video.views || 0)}
+          {formattedViews}
         </span>
 
-        {/* Duration badge - glass - bottom right */}
+        {/* Duration badge */}
         {video.duration && (
           <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
             <Clock className="w-3 h-3" />
@@ -109,35 +122,32 @@ export default function VideoCard({ video, onClick, highlightColor }: VideoCardP
 
       {/* Text content */}
       <div className="space-y-0.5">
-        <h3 
-          className="text-foreground text-xs font-medium leading-tight line-clamp-1 transition-colors"
-          style={{ }}
-        >
+        <h3 className="text-foreground text-xs font-medium leading-tight line-clamp-1">
           {video.title}
         </h3>
         <div className="flex items-center justify-between">
-          {video.release_date && (
+          {formattedDate && (
             <p className="text-muted-foreground text-[11px] truncate">
-              {formatDate(video.release_date)}
+              {formattedDate}
             </p>
           )}
           <div className="flex items-center gap-2">
-            {/* Like icon with count */}
+            {/* Like button */}
             <div className="flex items-center gap-0.5">
               <LikeButton videoCode={video.code} size="sm" showCount={true} />
             </div>
-            
+
             {/* Rating */}
             {video.rating_avg > 0 && (
               <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                <Star 
-                  className="w-3 h-3" 
-                  fill="none" 
-                  strokeWidth={2} 
-                  style={{ 
-                    color: highlightColor || '#ff0040', 
-                    filter: `drop-shadow(0 0 3px ${highlightColor || '#ff0040'})` 
-                  }} 
+                <Star
+                  className="w-3 h-3"
+                  fill="none"
+                  strokeWidth={2}
+                  style={{
+                    color: highlightColor || '#ff0040',
+                    filter: `drop-shadow(0 0 3px ${highlightColor || '#ff0040'})`
+                  }}
                 />
                 {video.rating_avg.toFixed(1)}
               </span>
@@ -147,4 +157,6 @@ export default function VideoCard({ video, onClick, highlightColor }: VideoCardP
       </div>
     </div>
   );
-}
+});
+
+export default VideoCard;

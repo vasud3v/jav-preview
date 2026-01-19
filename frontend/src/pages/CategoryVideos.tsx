@@ -4,7 +4,7 @@ import { ArrowLeft, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { VideoListItem, PaginatedResponse } from '@/lib/api';
 import { useCachedApi, CACHE_TTL } from '@/hooks/useApi';
-import VideoCard from '@/components/VideoCard';
+import VideoGrid from '@/components/VideoGrid';
 import Loading from '@/components/Loading';
 import { useNeonColor } from '@/context/NeonColorContext';
 
@@ -41,9 +41,9 @@ export default function CategoryVideos() {
         >
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
-        
+
         <div className="flex items-center gap-4">
-          <div 
+          <div
             className="w-14 h-14 rounded-xl border border-white/10 flex items-center justify-center"
             style={{ background: `linear-gradient(to bottom right, rgba(${color.rgb}, 0.2), rgba(${color.rgb}, 0.1))` }}
           >
@@ -84,11 +84,7 @@ export default function CategoryVideos() {
               No videos found for this category.
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
-              {videos.map((video) => (
-                <VideoCard key={video.code} video={video} />
-              ))}
-            </div>
+            <VideoGrid videos={videos} columns={6} />
           )}
 
           {totalPages > 1 && (

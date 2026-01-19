@@ -83,20 +83,19 @@ class JavTrailersScraper:
             self.driver.get(self.BASE_URL)
             time.sleep(8)
     
-    def _ensure_driver(self):
+    def _ensure_driver(self, force_restart: bool = False):
         """Ensure driver is alive, recreate if needed"""
-        if self.driver is None:
+        if self.driver is None or force_restart:
+            if self.driver:
+                self._close_driver()
             self._init_driver()
             return
+            
         try:
-            self.driver.current_url
-        except (ConnectionRefusedError, OSError, AttributeError) as e:
-            print(f"  Browser connection lost ({type(e).__name__}), restarting...")
-            self._close_driver()
-            self._init_driver()
+            # Simple check if driver is responsive
+            _ = self.driver.current_url
         except Exception as e:
-            # Log unexpected exceptions but still try to recover
-            print(f"  Unexpected browser error ({type(e).__name__}: {e}), restarting...")
+            print(f"  Browser connection lost ({type(e).__name__}), restarting...")
             self._close_driver()
             self._init_driver()
             
@@ -143,8 +142,20 @@ class JavTrailersScraper:
         self._ensure_driver()
         
         url = f"{self.BASE_URL}/videos" if page == 1 else f"{self.BASE_URL}/videos?page={page}"
-        self.driver.get(url)
-        time.sleep(5)
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.driver.get(url)
+                time.sleep(5)
+                break
+            except Exception as e:
+                print(f"  Error loading list page (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    print("  Restarting driver and retrying...")
+                    self._ensure_driver(force_restart=True)
+                else:
+                    return []
         
         video_links = []
         soup = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -161,19 +172,34 @@ class JavTrailersScraper:
 
     def scrape_video_page(self, url: str) -> Optional[VideoMetadata]:
         """Scrape metadata from a single video page"""
-        self._ensure_driver()
+        
+        # Retry loop for page load
+        max_retries = 3
+        page_source = None
+        
+        for attempt in range(max_retries):
+            try:
+                self._ensure_driver()
+                self.driver.get(url)
+                time.sleep(4)
+                page_source = self.driver.page_source
+                break
+            except Exception as e:
+                print(f"  Error loading video page (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    print("  Restarting driver and retrying...")
+                    self._ensure_driver(force_restart=True)
+                else:
+                    print(f"Failed to load {url} after {max_retries} attempts")
+                    return None
         
         try:
-            self.driver.get(url)
-            time.sleep(4)
-            
             code_match = re.search(r'/video/([a-zA-Z0-9_-]+)', url)
             raw_code = code_match.group(1) if code_match else ""
             code = self._format_code(raw_code)
             url_code = raw_code.lower()
             
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            page_source = self.driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
             
             if self.save_debug:
                 with open(f'debug_{url_code}.html', 'w', encoding='utf-8') as f:
