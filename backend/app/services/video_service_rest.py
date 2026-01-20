@@ -2,6 +2,7 @@
 Video service using Supabase REST API.
 Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
+import asyncio
 import math
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -1233,25 +1234,50 @@ async def get_all_categories() -> List[dict]:
     """Get all categories with video counts."""
     client = get_supabase_rest()
     
+    # Try to use Resource Embedding for efficient counting in a single query
+    # Supabase/PostgREST allows embedding with count
+    try:
+        categories = await client.get(
+            'categories',
+            select='id,name,video_categories(count)'
+        )
+
+        if categories:
+            result = []
+            for cat in categories:
+                # Extract count from the nested list
+                # PostgREST returns [{'count': N}] or []
+                vc_data = cat.get('video_categories', [])
+                count = vc_data[0]['count'] if vc_data and isinstance(vc_data, list) and 'count' in vc_data[0] else 0
+                result.append({'name': cat['name'], 'video_count': count})
+
+            result.sort(key=lambda x: x['video_count'], reverse=True)
+            return result
+
+    except Exception as e:
+        print(f"Resource embedding failed, falling back to parallel counts: {e}")
+
+    # Fallback to parallel queries if embedding fails (e.g. missing FK)
+
     # Get all categories
     categories = await client.get('categories', select='id,name')
     if not categories:
         return []
+
+    # Limit concurrency to avoid overwhelming the database/network
+    semaphore = asyncio.Semaphore(10)
     
-    # Get all video_categories entries to count locally (faster than N queries)
-    video_categories = await client.get('video_categories', select='category_id')
+    async def get_category_count(category):
+        async with semaphore:
+            count = await client.count(
+                'video_categories',
+                filters={'category_id': f"eq.{category['id']}"}
+            )
+            return {'name': category['name'], 'video_count': count}
     
-    # Count videos per category
-    cat_counts = {}
-    for vc in video_categories or []:
-        cat_id = vc.get('category_id')
-        if cat_id:
-            cat_counts[cat_id] = cat_counts.get(cat_id, 0) + 1
-    
-    result = []
-    for cat in categories:
-        video_count = cat_counts.get(cat['id'], 0)
-        result.append({'name': cat['name'], 'video_count': video_count})
+    # Execute counts in parallel
+    tasks = [get_category_count(cat) for cat in categories]
+    result = await asyncio.gather(*tasks)
     
     result.sort(key=lambda x: x['video_count'], reverse=True)
     return result
