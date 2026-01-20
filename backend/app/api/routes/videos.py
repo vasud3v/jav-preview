@@ -366,8 +366,7 @@ async def get_related_videos(
     strategy: str = Query('balanced', description="Strategy: balanced, similar, personalized, popular, explore")
 ):
     """Get personalized video recommendations based on content, watch history, and user preferences."""
-    # Simplified for REST API - return popular videos
-    result = await video_service.get_popular_videos(1, limit)
+    result = await video_service.get_related_videos(code, user_id, limit, strategy)
     # Return array directly to match frontend expectations
     return [item.model_dump() for item in result.items]
 
