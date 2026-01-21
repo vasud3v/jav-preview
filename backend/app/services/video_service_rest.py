@@ -1352,25 +1352,21 @@ async def get_all_cast() -> List[dict]:
     """Get all cast members with video counts."""
     client = get_supabase_rest()
     
-    # Get all cast members (pagination handles Supabase limits automatically)
-    cast_members = await client.get('cast_members', select='id,name')
+    # Get all cast members with video counts using resource embedding
+    # This avoids fetching the entire video_cast table
+    cast_members = await client.get('cast_members', select='id,name,video_cast(count)')
     if not cast_members:
         return []
-    
-    # Get all video_cast entries to count locally (faster than N queries)
-    video_cast = await client.get('video_cast', select='cast_id')
-    
-    # Count videos per cast member
-    cast_counts = {}
-    for vc in video_cast or []:
-        cast_id = vc.get('cast_id')
-        if cast_id:
-            cast_counts[cast_id] = cast_counts.get(cast_id, 0) + 1
     
     # Build result
     result = []
     for cm in cast_members:
-        video_count = cast_counts.get(cm['id'], 0)
+        # Extract count from nested structure: "video_cast": [{"count": 5}]
+        video_count = 0
+        vc = cm.get('video_cast')
+        if vc and isinstance(vc, list) and len(vc) > 0:
+            video_count = vc[0].get('count', 0)
+
         if video_count > 0:
             result.append({'name': cm['name'], 'video_count': video_count})
     
