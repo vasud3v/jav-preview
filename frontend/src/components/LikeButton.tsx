@@ -161,6 +161,7 @@ export default function LikeButton({
     <div 
       className={`relative inline-flex items-center justify-center ${className}`} 
       style={{ minWidth: `${config.container}px`, minHeight: `${config.container}px` }}
+      onClick={(e) => e.stopPropagation()}
     >
       <div className="heart-container" title={liked ? 'Unlike' : 'Like'}>
         <input
