@@ -1763,9 +1763,11 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 4. Get details of interacted videos to find patterns
         interacted_videos = []
-        codes_list = list(interacted_codes)[:20]
-        if codes_list:
-            codes_filter = ','.join(f'"{code}"' for code in codes_list)
+        # Use limited list of most recent interactions for pattern matching
+        interacted_codes_list = list(interacted_codes)[:20]
+
+        if interacted_codes_list:
+            codes_filter = ','.join(f'"{code}"' for code in interacted_codes_list)
             interacted_videos = await client.get(
                 'videos',
                 select='code,studio,series',
@@ -1791,7 +1793,8 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 5. Get categories from watched videos
         preferred_categories = {}
-        interacted_codes_list = list(interacted_codes)[:15]
+        # Reuse the codes list, but maybe limit slightly more for heavier queries if needed
+        # We'll use the same list (up to 20) for consistency and caching benefits
 
         # Batch fetch categories
         all_categories = await _get_categories_for_videos(client, interacted_codes_list)
@@ -1805,7 +1808,7 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         # 6. Get cast from watched videos
         preferred_cast = {}
 
-        # Batch fetch cast
+        # Batch fetch cast (Optimized: avoids N+1 query)
         all_cast = await _get_cast_for_videos(client, interacted_codes_list)
         for code in interacted_codes_list:
             cast_members = all_cast.get(code, [])
