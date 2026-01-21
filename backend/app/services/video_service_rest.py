@@ -1763,15 +1763,17 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 4. Get details of interacted videos to find patterns
         interacted_videos = []
-        for code in list(interacted_codes)[:20]:  # Limit to avoid too many queries
-            video = await client.get(
+        codes_to_fetch = list(interacted_codes)[:20]
+
+        if codes_to_fetch:
+            codes_filter = ','.join(f'"{code}"' for code in codes_to_fetch)
+            videos = await client.get(
                 'videos',
                 select='code,studio,series',
-                filters={'code': f'eq.{code}'},
-                limit=1
+                filters={'code': f'in.({codes_filter})'}
             )
-            if video:
-                interacted_videos.extend(video)
+            if videos:
+                interacted_videos.extend(videos)
         
         # Extract preferences
         preferred_studios = {}
@@ -1852,68 +1854,97 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
                         seen_codes.add(v['code'])
         
         # Strategy 3: Same categories
-        for category, _ in top_categories:
-            # Get category ID
-            cat_data = await client.get(
-                'categories',
-                filters={'name': f'eq.{category}'},
-                limit=1
-            )
-            if cat_data:
-                cat_id = cat_data[0]['id']
-                # Get videos in this category
-                cat_videos = await client.get(
-                    'video_categories',
-                    select='video_code',
-                    filters={'category_id': f'eq.{cat_id}'},
-                    limit=20
+        if top_categories:
+            # 1. Batch fetch category IDs
+            cat_names = [c[0] for c in top_categories]
+            # Warning: Supabase 'in' syntax for strings requires careful quoting if they contain commas
+            # But simple names should be fine
+            # We fetch all matching categories in one go
+            # Since 'name' is unique, we get list of IDs
+            # However, simpler to iterate top 3 categories as that's small overhead (3 calls)
+            # Optimizing the inner loop (fetching videos) is more critical
+
+            for category, _ in top_categories:
+                # Get category ID
+                cat_data = await client.get(
+                    'categories',
+                    filters={'name': f'eq.{category}'},
+                    limit=1
                 )
-                if cat_videos:
-                    for cv in cat_videos[:15]:
-                        code = cv['video_code']
-                        if code not in seen_codes:
-                            video = await client.get(
+                if cat_data:
+                    cat_id = cat_data[0]['id']
+                    # Get videos in this category
+                    cat_videos = await client.get(
+                        'video_categories',
+                        select='video_code',
+                        filters={'category_id': f'eq.{cat_id}'},
+                        limit=20
+                    )
+
+                    if cat_videos:
+                        # Collect codes to fetch
+                        codes_to_fetch = []
+                        for cv in cat_videos[:15]:
+                            code = cv['video_code']
+                            if code not in seen_codes:
+                                codes_to_fetch.append(code)
+                                seen_codes.add(code)
+
+                        if codes_to_fetch:
+                            # Batch fetch video details
+                            codes_filter = ','.join(f'"{c}"' for c in codes_to_fetch)
+                            videos = await client.get(
                                 'videos',
                                 select='code,title,thumbnail_url,duration,release_date,studio,views',
-                                filters={'code': f'eq.{code}'},
-                                limit=1
+                                filters={'code': f'in.({codes_filter})'}
                             )
-                            if video:
-                                video[0]['_score'] = WEIGHT_CATEGORY
-                                candidates.append(video[0])
-                                seen_codes.add(code)
+
+                            if videos:
+                                for v in videos:
+                                    v['_score'] = WEIGHT_CATEGORY
+                                    candidates.append(v)
         
         # Strategy 4: Same cast
-        for cast_name, _ in top_cast:
-            # Get cast ID
-            cast_data = await client.get(
-                'cast_members',
-                filters={'name': f'eq.{cast_name}'},
-                limit=1
-            )
-            if cast_data:
-                cast_id = cast_data[0]['id']
-                # Get videos with this cast
-                cast_videos = await client.get(
-                    'video_cast',
-                    select='video_code',
-                    filters={'cast_id': f'eq.{cast_id}'},
-                    limit=15
+        if top_cast:
+            for cast_name, _ in top_cast:
+                # Get cast ID
+                cast_data = await client.get(
+                    'cast_members',
+                    filters={'name': f'eq.{cast_name}'},
+                    limit=1
                 )
-                if cast_videos:
-                    for cv in cast_videos[:10]:
-                        code = cv['video_code']
-                        if code not in seen_codes:
-                            video = await client.get(
+                if cast_data:
+                    cast_id = cast_data[0]['id']
+                    # Get videos with this cast
+                    cast_videos = await client.get(
+                        'video_cast',
+                        select='video_code',
+                        filters={'cast_id': f'eq.{cast_id}'},
+                        limit=15
+                    )
+
+                    if cast_videos:
+                        # Collect codes to fetch
+                        codes_to_fetch = []
+                        for cv in cast_videos[:10]:
+                            code = cv['video_code']
+                            if code not in seen_codes:
+                                codes_to_fetch.append(code)
+                                seen_codes.add(code)
+
+                        if codes_to_fetch:
+                            # Batch fetch video details
+                            codes_filter = ','.join(f'"{c}"' for c in codes_to_fetch)
+                            videos = await client.get(
                                 'videos',
                                 select='code,title,thumbnail_url,duration,release_date,studio,views',
-                                filters={'code': f'eq.{code}'},
-                                limit=1
+                                filters={'code': f'in.({codes_filter})'}
                             )
-                            if video:
-                                video[0]['_score'] = WEIGHT_CAST
-                                candidates.append(video[0])
-                                seen_codes.add(code)
+
+                            if videos:
+                                for v in videos:
+                                    v['_score'] = WEIGHT_CAST
+                                    candidates.append(v)
         
         # 8. Score and rank candidates
         import math
