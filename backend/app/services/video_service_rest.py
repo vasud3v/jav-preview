@@ -49,6 +49,16 @@ VIEW_VELOCITY_WEIGHT = 0.6  # Weight for view velocity in trending
 RECENCY_BOOST_FACTOR = 1.5  # Boost factor for recent content
 
 
+def _sanitize_query(query: str) -> str:
+    """Sanitize search query for PostgREST syntax."""
+    if not query:
+        return ""
+    # Remove characters that can break PostgREST filter syntax
+    # ( ) are used for grouping, , is used for OR lists
+    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    return safe_query.strip()
+
+
 async def _get_ratings_for_videos(video_codes: list) -> dict:
     """Get rating statistics for multiple videos efficiently."""
     if not video_codes:
@@ -374,7 +384,8 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    safe_query = _sanitize_query(query)
+    search_term = f'*{safe_query}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -1818,11 +1829,13 @@ async def get_search_suggestions(query: str, limit: int = 10) -> dict:
     client = get_supabase_rest()
     suggestions = []
     
+    safe_query = _sanitize_query(query)
+
     # Video code/title suggestions
     videos = await client.get(
         'videos',
         select='code,title',
-        filters={'or': f'(code.ilike.*{query}*,title.ilike.*{query}*)'},
+        filters={'or': f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*)'},
         limit=5
     )
     
@@ -1838,7 +1851,7 @@ async def get_search_suggestions(query: str, limit: int = 10) -> dict:
     cast = await client.get(
         'cast_members',
         select='name',
-        filters={'name': f'ilike.*{query}*'},
+        filters={'name': f'ilike.*{safe_query}*'},
         limit=3
     )
     
@@ -1859,9 +1872,8 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
     client = get_supabase_rest()
 
     # Sanitize query to prevent filter syntax errors
-    # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
-    search_term = f'*{safe_query.strip()}*'
+    safe_query = _sanitize_query(query)
+    search_term = f'*{safe_query}*'
 
     # Fetch videos matching query (larger limit for facets)
     videos = await client.get(
@@ -2026,7 +2038,8 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = _sanitize_query(query)
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {
