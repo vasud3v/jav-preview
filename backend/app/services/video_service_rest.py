@@ -2077,3 +2077,201 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         # Fallback to trending content
         return await get_trending_videos(page, page_size)
 
+
+async def get_related_videos(
+    code: str,
+    user_id: str = None,
+    limit: int = 12,
+    strategy: str = 'balanced'
+) -> PaginatedResponse:
+    """
+    Get related videos based on strategy.
+    Strategies:
+    - similar: Content-based filtering (series, studio, cast, categories)
+    - balanced: Mix of similar content and popularity
+    - popular: Just popular videos
+    - personalized: User preferences + current video context
+    - explore: Random/Trending discovery
+    """
+    client = get_supabase_rest()
+
+    # 0. Handle 'popular' strategy directly
+    if strategy == 'popular':
+        return await get_popular_videos(1, limit)
+
+    # 0. Handle 'explore' strategy directly
+    if strategy == 'explore':
+        # Mix of trending and new releases
+        trending = await get_trending_videos(1, limit)
+        return trending
+
+    # 1. Fetch source video details
+    video = await client.get(
+        'videos',
+        filters={'code': f'eq.{code}'},
+        single=True
+    )
+
+    if not video:
+        # Fallback if video not found
+        return await get_popular_videos(1, limit)
+
+    # Get metadata
+    categories = await _get_video_categories(client, code)
+    cast = await _get_video_cast(client, code)
+
+    source_studio = video.get('studio')
+    source_series = video.get('series')
+
+    # 2. Build candidates based on strategy
+    candidates = []
+    seen_codes = {code} # Exclude source video
+
+    # Weights for scoring
+    w_series = 0
+    w_studio = 0
+    w_cast = 0
+    w_cat = 0
+    w_pop = 0
+
+    if strategy == 'similar':
+        w_series = 50
+        w_studio = 30
+        w_cast = 20
+        w_cat = 10
+        w_pop = 1 # Low popularity weight, focus on content
+    elif strategy == 'balanced':
+        w_series = 40
+        w_studio = 20
+        w_cast = 15
+        w_cat = 10
+        w_pop = 20 # Higher popularity weight
+    elif strategy == 'personalized':
+        # Treat personalized as balanced but if we had user context we could boost videos they haven't seen.
+        w_series = 40
+        w_studio = 20
+        w_cast = 15
+        w_cat = 10
+        w_pop = 10
+        # If user_id is provided, fetch history to exclude watched
+        if user_id:
+            watch_history = await client.get(
+                'watch_history',
+                select='video_code',
+                filters={'user_id': f'eq.{user_id}'}
+            )
+            for h in watch_history or []:
+                seen_codes.add(h['video_code'])
+
+    # Fetch Candidates
+
+    # A. Same Series (Strongest signal)
+    if source_series:
+        series_videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            filters={'series': f'eq.{source_series}'},
+            limit=10
+        )
+        if series_videos:
+            for v in series_videos:
+                if v['code'] not in seen_codes:
+                    v['_score'] = w_series
+                    candidates.append(v)
+                    seen_codes.add(v['code'])
+
+    # B. Same Studio
+    if source_studio:
+        studio_videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            filters={'studio': f'eq.{source_studio}'},
+            limit=10
+        )
+        if studio_videos:
+            for v in studio_videos:
+                if v['code'] not in seen_codes:
+                    v['_score'] = w_studio
+                    candidates.append(v)
+                    seen_codes.add(v['code'])
+
+    # C. Same Cast
+    if cast:
+        for cast_name in cast[:3]:
+             cast_data = await client.get('cast_members', filters={'name': f'eq.{cast_name}'}, single=True)
+             if cast_data:
+                 c_id = cast_data['id']
+                 junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
+                 if junctions:
+                     codes = [j['video_code'] for j in junctions]
+                     needed_codes = [c for c in codes if c not in seen_codes]
+                     if needed_codes:
+                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+                         cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
+                         if cast_vids:
+                             for v in cast_vids:
+                                 if v['code'] not in seen_codes:
+                                     v['_score'] = w_cast
+                                     candidates.append(v)
+                                     seen_codes.add(v['code'])
+                                 else:
+                                     # Boost existing candidate
+                                     for cand in candidates:
+                                         if cand['code'] == v['code']:
+                                             cand['_score'] += w_cast
+
+    # D. Same Categories
+    if categories:
+        for cat_name in categories[:3]:
+             cat_data = await client.get('categories', filters={'name': f'eq.{cat_name}'}, single=True)
+             if cat_data:
+                 c_id = cat_data['id']
+                 junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
+                 if junctions:
+                     codes = [j['video_code'] for j in junctions]
+                     needed_codes = [c for c in codes if c not in seen_codes]
+                     if needed_codes:
+                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+                         cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
+                         if cat_vids:
+                             for v in cat_vids:
+                                 if v['code'] not in seen_codes:
+                                     v['_score'] = w_cat
+                                     candidates.append(v)
+                                     seen_codes.add(v['code'])
+                                 else:
+                                     for cand in candidates:
+                                         if cand['code'] == v['code']:
+                                             cand['_score'] += w_cat
+
+    # Refine Scores
+    import math
+    for v in candidates:
+        # Add popularity score
+        views = v.get('views', 0)
+        pop_score = math.log10(max(views, 1) + 1) * w_pop
+        v['_score'] += pop_score
+
+    # Sort
+    candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
+
+    # Fill if not enough
+    if len(candidates) < limit:
+        # Fetch popular/trending to fill
+        needed = limit - len(candidates)
+        filler = await client.get('videos', order='views.desc', limit=needed + 10)
+        if filler:
+            for v in filler:
+                if len(candidates) >= limit:
+                    break
+                if v['code'] not in seen_codes:
+                    candidates.append(v)
+                    seen_codes.add(v['code'])
+
+    # Limit
+    final_items = candidates[:limit]
+
+    # Convert to items
+    items = await _videos_to_list_items(final_items)
+
+    return await _paginate(items, len(candidates), 1, limit)
