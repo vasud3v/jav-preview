@@ -40,12 +40,71 @@ class MigrationTool:
             return []
         return list(self.json_dir.glob("*.json"))
     
-    def migrate(self, progress_callback: Callable[[int, int, str], None] = None) -> MigrationResult:
+    def _process_batch(self, batch_data: List[dict], batch_filenames: List[str], result: MigrationResult) -> None:
+        """
+        Process a batch of video data.
+
+        Args:
+            batch_data: List of video data dictionaries
+            batch_filenames: List of filenames corresponding to the data
+            result: MigrationResult object to update
+        """
+        if not batch_data:
+            return
+
+        # Get all codes
+        codes = [d.get('code') for d in batch_data]
+
+        # Check existence in batch
+        existing_status = self.storage.videos_exist_batch(codes)
+
+        # Filter new videos
+        new_videos = []
+        new_filenames = []
+
+        for i, video_data in enumerate(batch_data):
+            code = video_data.get('code')
+            if existing_status.get(code, False):
+                result.skipped += 1
+            else:
+                new_videos.append(video_data)
+                new_filenames.append(batch_filenames[i])
+
+        # Save new videos in batch
+        if new_videos:
+            success_count, errors = self.storage.save_videos_batch(new_videos)
+            result.migrated += success_count
+
+            # Handle errors
+            if errors:
+                # If success_count is 0, it means the entire batch failed (rollback)
+                # save_videos_batch returns (0, errors) on failure or (len(videos), []) on success
+                # The errors list contains "code: reason" strings
+
+                # We need to map errors back to filenames if possible
+                code_to_filename = {v.get('code'): f for v, f in zip(new_videos, new_filenames)}
+
+                for error in errors:
+                    # Error format is "code: reason" or "unknown: reason" or "Batch error: reason"
+                    parts = error.split(': ', 1)
+                    if len(parts) == 2:
+                        code_part, reason = parts
+                        filename = code_to_filename.get(code_part, "batch")
+                        result.errors.append(f"{filename}: {reason}")
+                    else:
+                        result.errors.append(f"Batch error: {error}")
+
+                if success_count == 0:
+                     # All failed
+                    result.failed += len(new_videos)
+
+    def migrate(self, progress_callback: Callable[[int, int, str], None] = None, batch_size: int = 50) -> MigrationResult:
         """
         Migrate all JSON files to database.
         
         Args:
             progress_callback: Optional callback(processed, total, current_file)
+            batch_size: Number of videos to process in a batch
             
         Returns:
             MigrationResult with counts and any errors
@@ -67,6 +126,8 @@ class MigrationTool:
         
         print(f"Found {total} JSON files to migrate")
 
+        batch_data = []
+        batch_filenames = []
         
         for i, json_file in enumerate(json_files):
             filename = json_file.name
@@ -85,17 +146,13 @@ class MigrationTool:
                     result.errors.append(f"{filename}: Missing code")
                     continue
                 
-                # Check if already exists
-                if self.storage.video_exists(code):
-                    result.skipped += 1
-                    continue
+                batch_data.append(video_data)
+                batch_filenames.append(filename)
                 
-                # Save to database
-                if self.storage.save_video(video_data):
-                    result.migrated += 1
-                else:
-                    result.failed += 1
-                    result.errors.append(f"{filename}: Save failed")
+                if len(batch_data) >= batch_size:
+                    self._process_batch(batch_data, batch_filenames, result)
+                    batch_data = []
+                    batch_filenames = []
                     
             except json.JSONDecodeError as e:
                 result.failed += 1
@@ -104,6 +161,10 @@ class MigrationTool:
                 result.failed += 1
                 result.errors.append(f"{filename}: {e}")
         
+        # Process remaining
+        if batch_data:
+            self._process_batch(batch_data, batch_filenames, result)
+
         print(f"\nMigration complete:")
         print(f"  Total files: {result.total_files}")
         print(f"  Migrated: {result.migrated}")
@@ -127,9 +188,10 @@ def main():
     parser = argparse.ArgumentParser(description='Migrate JSON video files to SQLite database')
     parser.add_argument('--json-dir', default='database/videos', help='Directory with JSON files')
     parser.add_argument('--db-path', default='database/videos.db', help='SQLite database path')
+    parser.add_argument('--batch-size', type=int, default=50, help='Batch size for database commits')
     args = parser.parse_args()
     
-    print(f"Migrating from {args.json_dir} to {args.db_path}")
+    print(f"Migrating from {args.json_dir} to {args.db_path} (batch size: {args.batch_size})")
     
     storage = DatabaseStorage(database_path=args.db_path)
     tool = MigrationTool(storage, json_dir=args.json_dir)
@@ -138,7 +200,7 @@ def main():
         if current % 100 == 0 or current == total:
             print(f"Progress: {current}/{total} ({100*current//total}%)")
     
-    result = tool.migrate(progress_callback=progress)
+    result = tool.migrate(progress_callback=progress, batch_size=args.batch_size)
     
     storage.close()
     
