@@ -4,6 +4,8 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
+import functools
+import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
@@ -47,6 +49,43 @@ LIKE_WEIGHT_IN_TRENDING = 0.4  # Increased from 0.3 for more like influence
 LIKE_RATIO_BOOST = 3.0  # Increased from 2.0 for better like ratio impact
 VIEW_VELOCITY_WEIGHT = 0.6  # Weight for view velocity in trending
 RECENCY_BOOST_FACTOR = 1.5  # Boost factor for recent content
+
+
+# ============================================
+# Caching Decorator
+# ============================================
+
+def async_cache(ttl_seconds=300):
+    """Simple async cache decorator with TTL."""
+    def decorator(func):
+        cache = {}
+
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Generate key from args and kwargs
+            # Convert lists to tuples to make them hashable
+            key_args = tuple(tuple(x) if isinstance(x, list) else x for x in args)
+            key_kwargs = tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in kwargs.items()))
+            key = (key_args, key_kwargs)
+
+            now = time.time()
+
+            if key in cache:
+                data, timestamp = cache[key]
+                if now - timestamp < ttl_seconds:
+                    return data
+
+            result = await func(*args, **kwargs)
+            cache[key] = (result, now)
+            return result
+
+        # Attach clear method
+        def clear_cache():
+            cache.clear()
+        wrapper.clear_cache = clear_cache
+
+        return wrapper
+    return decorator
 
 
 async def _get_ratings_for_videos(video_codes: list) -> dict:
@@ -1512,6 +1551,7 @@ async def merge_watch_history(from_user_id: str, to_user_id: str) -> dict:
 # Categories, Studios, Series helpers
 # ============================================
 
+@async_cache(ttl_seconds=600)  # Cache for 10 minutes
 async def get_all_categories() -> List[dict]:
     """Get all categories with video counts."""
     client = get_supabase_rest()
@@ -1565,6 +1605,7 @@ async def get_all_categories() -> List[dict]:
     return result
 
 
+@async_cache(ttl_seconds=600)  # Cache for 10 minutes
 async def get_all_studios() -> List[dict]:
     """Get all studios with video counts."""
     client = get_supabase_rest()
@@ -1584,6 +1625,7 @@ async def get_all_studios() -> List[dict]:
     return result
 
 
+@async_cache(ttl_seconds=600)  # Cache for 10 minutes
 async def get_all_cast() -> List[dict]:
     """Get all cast members with video counts."""
     client = get_supabase_rest()
@@ -1610,6 +1652,7 @@ async def get_all_cast() -> List[dict]:
     return result[:100]  # Limit to top 100
 
 
+@async_cache(ttl_seconds=600)  # Cache for 10 minutes
 async def get_all_series() -> List[dict]:
     """Get all series with video counts."""
     client = get_supabase_rest()
@@ -1733,6 +1776,7 @@ async def get_cast_with_images(limit: int = 100) -> List[dict]:
     return result[:limit]
 
 
+@async_cache(ttl_seconds=600)  # Cache for 10 minutes
 async def get_all_cast_with_images() -> List[dict]:
     """
     Get ALL cast members (with or without images, with or without videos).
