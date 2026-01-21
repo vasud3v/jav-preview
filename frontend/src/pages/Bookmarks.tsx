@@ -23,28 +23,43 @@ export default function Bookmarks() {
   const [total, setTotal] = useState(0);
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
 
-  const getUserId = () => user?.id ? `user_${user.id}` : null;
-
   useEffect(() => {
-    const userId = getUserId();
+    const userId = user?.id ? `user_${user.id}` : null;
     if (!userId) {
-      setLoading(false);
       return;
     }
     
-    setLoading(true);
-    setError(false);
-    api.getBookmarks(userId, page, 20)
-      .then(data => {
-        setVideos(data.items);
-        setTotalPages(data.total_pages);
-        setTotal(data.total);
-      })
-      .catch(() => {
-        setVideos([]);
-        setError(true);
-      })
-      .finally(() => setLoading(false));
+    // Using a flag to prevent setting state on unmounted component
+    let mounted = true;
+
+    // Async function to load bookmarks
+    const load = async () => {
+      setLoading(true);
+      setError(false);
+      try {
+        const data = await api.getBookmarks(userId, page, 20);
+        if (mounted) {
+          setVideos(data.items);
+          setTotalPages(data.total_pages);
+          setTotal(data.total);
+        }
+      } catch {
+        if (mounted) {
+          setVideos([]);
+          setError(true);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
   }, [page, user]);
 
   useEffect(() => {

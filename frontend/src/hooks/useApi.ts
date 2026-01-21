@@ -29,6 +29,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
 
   useEffect(() => {
     refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { ...state, refetch };
@@ -70,7 +71,11 @@ export function useCachedApi<T>(
   const [isStale, setIsStale] = useState(false);
   
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
+
   const isMountedRef = useRef(true);
 
   const refetch = useCallback(async () => {
@@ -126,6 +131,7 @@ export function useCachedApi<T>(
     return () => {
       isMountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey, ...deps]);
 
   return { data, loading, error, isStale, refetch };

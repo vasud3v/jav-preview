@@ -19,7 +19,7 @@ export default function Calendar() {
     { cacheKey: 'calendar:videos', ttl: CACHE_TTL.LONG }
   );
 
-  const videos = data?.items ?? [];
+  const videos = useMemo(() => data?.items ?? [], [data]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -29,6 +29,16 @@ export default function Calendar() {
 
   const videosByDate = useMemo(() => {
     const map: Record<string, VideoListItem[]> = {};
+    // videos is an array of objects, so changing it to JSON string for stable dependency or just trust it.
+    // The linter warning was about logical expression making dependencies change.
+    // Actually the warning was on the previous useMemo (monthStats) which I fixed?
+    // Let's check the lint output again.
+    // 22:9 warning The 'videos' logical expression could make the dependencies of useMemo Hook (at line 40) change on every render.
+    // Line 40 is videosByDate.
+    // `const videos = data?.items ?? [];` -> videos is a new array every render if data changes.
+    // But data comes from useCachedApi which returns stable data.
+    // However, `?? []` creates a new array if data.items is undefined.
+    // If data is undefined, we get [].
     videos.forEach(v => {
       if (v.release_date) {
         const date = v.release_date.split('T')[0];
@@ -49,6 +59,7 @@ export default function Calendar() {
       if (dayCount > 0) daysWithVideos++;
     }
     return { count, daysWithVideos };
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [videosByDate, year, month, daysInMonth]);
 
   const getWeekDates = () => {

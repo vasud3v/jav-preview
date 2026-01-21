@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, Eye, Star, Film } from 'lucide-react';
-import { useNeonColor } from '@/context/NeonColorContext';
+// import { useNeonColor } from '@/context/NeonColorContext';
 import type { VideoListItem } from '@/lib/api';
 import { proxyImageUrl } from '@/lib/api';
 import LikeButton from './LikeButton';
@@ -48,7 +48,8 @@ const formatDate = (dateStr: string): string => {
 const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
-  const { color } = useNeonColor();
+  // Remove unused color variable
+  // const { color } = useNeonColor();
 
   // Memoize computed values
   const hasValidThumbnail = useMemo(

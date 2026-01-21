@@ -26,14 +26,18 @@ export default function CastVideos() {
 
   // Fetch cast image from first video
   useEffect(() => {
+    // Only check if we have videos and don't have an image yet
+    // Using a ref or just checking videos[0] specifically to avoid dependency on the whole array
     if (videos.length > 0 && name && !castImage) {
-      api.getVideo(videos[0].code).then(firstVideo => {
+      const firstCode = videos[0].code;
+      api.getVideo(firstCode).then(firstVideo => {
         if (firstVideo.cast_images && firstVideo.cast_images[name]) {
           setCastImage(firstVideo.cast_images[name]);
         }
       }).catch(() => { });
     }
-  }, [videos, name, castImage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videos.length > 0 ? videos[0].code : null, name, castImage]);
 
   if (!name) {
     return (

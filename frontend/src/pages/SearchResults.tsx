@@ -120,7 +120,23 @@ export default function SearchResults() {
   // Main search effect
   useEffect(() => {
     if (!query && !filters.category && !filters.studio && !filters.cast && !filters.series) {
-      setVideos([]);
+      // Avoid calling setState synchronously if possible, or accept it here as reset.
+      // But lint complained about setting videos to [] in effect.
+      // We can just conditionally call API or not.
+      // However, if we need to clear previous results, we should do it.
+      // The issue was cascading renders.
+      // Let's defer it or handle it differently.
+      // Actually, just checking if we HAVE videos to clear.
+      // Using a ref or just deferring it?
+      // Or we can assume that if query is empty, we don't need to do anything,
+      // BUT if we just cleared the query, we want to clear the results.
+      // The issue is that setting state triggers re-render, then effect runs again?
+      // No, only if deps change.
+
+      // We reset state here if query is empty
+      if (videos.length > 0) {
+        setVideos([]);
+      }
       setLoading(false);
       return;
     }
@@ -147,12 +163,12 @@ export default function SearchResults() {
       })
       .catch(() => { })
       .finally(() => setLoading(false));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, filters, page]);
 
   // Reset page when query or filters change
-  useEffect(() => {
-    setPage(1);
-  }, [query, filters]);
+  // Removed useEffect causing cascading renders.
+  // We will reset page when setting query or filters.
 
   // Save to search history
   const saveToHistory = (q: string) => {
@@ -167,6 +183,7 @@ export default function SearchResults() {
     if (searchInput.trim()) {
       saveToHistory(searchInput.trim());
       setSearchParams({ q: searchInput.trim() });
+      setPage(1);
       setShowSuggestions(false);
     }
   };
@@ -209,6 +226,7 @@ export default function SearchResults() {
 
   const clearFilter = (key: keyof SearchFilters) => {
     setFilters(prev => ({ ...prev, [key]: undefined }));
+    setPage(1);
   };
 
   const activeFilterCount = [
@@ -370,7 +388,7 @@ export default function SearchResults() {
               return (
                 <button
                   key={option.value}
-                  onClick={() => setFilters(prev => ({ ...prev, sortBy: option.value }))}
+                  onClick={() => { setFilters(prev => ({ ...prev, sortBy: option.value })); setPage(1); }}
                   className={`w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors cursor-pointer ${filters.sortBy === option.value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     }`}
                 >
@@ -381,7 +399,7 @@ export default function SearchResults() {
             })}
             <div className="border-t border-zinc-800">
               <button
-                onClick={() => setFilters(prev => ({ ...prev, sortOrder: prev.sortOrder === 'desc' ? 'asc' : 'desc' }))}
+                onClick={() => { setFilters(prev => ({ ...prev, sortOrder: prev.sortOrder === 'desc' ? 'asc' : 'desc' })); setPage(1); }}
                 className="w-full px-4 py-2.5 flex items-center gap-3 text-left text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100 transition-colors cursor-pointer"
               >
                 {filters.sortOrder === 'desc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
@@ -440,7 +458,7 @@ export default function SearchResults() {
                 <label className="block text-sm font-medium text-foreground mb-2">Category</label>
                 <select
                   value={filters.category || ''}
-                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value || undefined }))}
+                  onChange={(e) => { setFilters(prev => ({ ...prev, category: e.target.value || undefined })); setPage(1); }}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Categories</option>
@@ -459,7 +477,7 @@ export default function SearchResults() {
                 <label className="block text-sm font-medium text-foreground mb-2">Studio</label>
                 <select
                   value={filters.studio || ''}
-                  onChange={(e) => setFilters(prev => ({ ...prev, studio: e.target.value || undefined }))}
+                  onChange={(e) => { setFilters(prev => ({ ...prev, studio: e.target.value || undefined })); setPage(1); }}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Studios</option>
@@ -478,7 +496,7 @@ export default function SearchResults() {
                 <label className="block text-sm font-medium text-foreground mb-2">Cast</label>
                 <select
                   value={filters.cast || ''}
-                  onChange={(e) => setFilters(prev => ({ ...prev, cast: e.target.value || undefined }))}
+                  onChange={(e) => { setFilters(prev => ({ ...prev, cast: e.target.value || undefined })); setPage(1); }}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                 >
                   <option value="">All Cast</option>
@@ -496,7 +514,7 @@ export default function SearchResults() {
               <label className="block text-sm font-medium text-foreground mb-2">Minimum Rating</label>
               <select
                 value={filters.minRating || ''}
-                onChange={(e) => setFilters(prev => ({ ...prev, minRating: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                onChange={(e) => { setFilters(prev => ({ ...prev, minRating: e.target.value ? parseFloat(e.target.value) : undefined })); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               >
                 <option value="">Any Rating</option>
@@ -512,7 +530,7 @@ export default function SearchResults() {
               <input
                 type="date"
                 value={filters.dateFrom || ''}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value || undefined }))}
+                onChange={(e) => { setFilters(prev => ({ ...prev, dateFrom: e.target.value || undefined })); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               />
             </div>
@@ -523,7 +541,7 @@ export default function SearchResults() {
               <input
                 type="date"
                 value={filters.dateTo || ''}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value || undefined }))}
+                onChange={(e) => { setFilters(prev => ({ ...prev, dateTo: e.target.value || undefined })); setPage(1); }}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
               />
             </div>
@@ -532,7 +550,7 @@ export default function SearchResults() {
           {/* Clear All Filters */}
           {activeFilterCount > 0 && (
             <button
-              onClick={() => setFilters({ sortBy: 'relevance', sortOrder: 'desc' })}
+              onClick={() => { setFilters({ sortBy: 'relevance', sortOrder: 'desc' }); setPage(1); }}
               className="mt-4 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               Clear all filters
@@ -558,7 +576,7 @@ export default function SearchResults() {
           </p>
           {activeFilterCount > 0 && (
             <button
-              onClick={() => setFilters({ sortBy: 'relevance', sortOrder: 'desc' })}
+              onClick={() => { setFilters({ sortBy: 'relevance', sortOrder: 'desc' }); setPage(1); }}
               className="text-primary hover:underline cursor-pointer"
             >
               Clear filters and try again

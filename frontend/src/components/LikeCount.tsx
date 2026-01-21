@@ -23,19 +23,18 @@ export default function LikeCount({
   const userId = getUserId();
 
   useEffect(() => {
+    const loadLikeCount = async () => {
+      try {
+        const data = await api.getLikeStatus(videoCode, userId);
+        setLikeCount(data.like_count);
+      } catch (err) {
+        console.error('Failed to load like count:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
     loadLikeCount();
-  }, [videoCode]);
-
-  const loadLikeCount = async () => {
-    try {
-      const data = await api.getLikeStatus(videoCode, userId);
-      setLikeCount(data.like_count);
-    } catch (err) {
-      console.error('Failed to load like count:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [videoCode, userId]);
 
   const formatCount = (count: number): string => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;

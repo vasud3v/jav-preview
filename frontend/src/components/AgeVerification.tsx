@@ -4,19 +4,17 @@ import { AlertCircle } from 'lucide-react';
 const STORAGE_KEY = 'age_verified';
 
 export default function AgeVerification() {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(() => !localStorage.getItem(STORAGE_KEY));
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    const verified = localStorage.getItem(STORAGE_KEY);
-    if (!verified) {
-      setShow(true);
+    if (show) {
       document.body.style.overflow = 'hidden';
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, []);
+  }, [show]);
 
   const handleEnter = () => {
     localStorage.setItem(STORAGE_KEY, 'true');

@@ -14,21 +14,20 @@ export default function LikedVideos() {
   const userId = getUserId();
 
   useEffect(() => {
+    const loadLikedVideos = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getLikedVideos(userId, page, 20);
+        setVideos(data.items);
+        setTotalPages(data.total_pages);
+      } catch (err) {
+        console.error('Failed to load liked videos:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
     loadLikedVideos();
   }, [page, userId]);
-
-  const loadLikedVideos = async () => {
-    setLoading(true);
-    try {
-      const data = await api.getLikedVideos(userId, page, 20);
-      setVideos(data.items);
-      setTotalPages(data.total_pages);
-    } catch (err) {
-      console.error('Failed to load liked videos:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background pt-20 pb-12 px-4">

@@ -3,36 +3,28 @@ import { useNeonColor } from '@/context/NeonColorContext';
 
 const ThemeToggle = () => {
     const { color } = useNeonColor();
-    const [isDark, setIsDark] = useState(true); // Default to dark
 
-    // Initialize theme on mount
-    useEffect(() => {
+    // Initialize state lazily to avoid effect update
+    const [isDark, setIsDark] = useState(() => {
         const stored = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const shouldBeDark = stored ? stored === 'dark' : prefersDark;
-        
-        setIsDark(shouldBeDark);
-        applyTheme(shouldBeDark);
-    }, []);
+        return stored ? stored === 'dark' : prefersDark;
+    });
 
     // Apply theme to document
-    const applyTheme = (dark: boolean) => {
+    useEffect(() => {
         const root = document.documentElement;
-        
-        if (dark) {
+        if (isDark) {
             root.classList.add('dark');
         } else {
             root.classList.remove('dark');
         }
-        
-        localStorage.setItem('theme', dark ? 'dark' : 'light');
-    };
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }, [isDark]);
 
     // Toggle theme
     const toggleTheme = () => {
-        const newTheme = !isDark;
-        setIsDark(newTheme);
-        applyTheme(newTheme);
+        setIsDark(prev => !prev);
     };
 
     return (

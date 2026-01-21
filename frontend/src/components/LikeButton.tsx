@@ -21,7 +21,8 @@ export default function LikeButton({
 }: LikeButtonProps) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // loading state removed as it was unused in render
+  // const [loading, setLoading] = useState(true);
   const [animationKey, setAnimationKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
   const userId = getUserId();
@@ -44,11 +45,11 @@ export default function LikeButton({
     return () => {
       isMountedRef.current = false;
     };
-  }, [videoCode, userId]);
+  }, [loadLikeStatus]);
 
-  const loadLikeStatus = async () => {
+  const loadLikeStatus = useCallback(async () => {
     if (!videoCode) {
-      setLoading(false);
+      // setLoading(false);
       return;
     }
     
@@ -66,10 +67,10 @@ export default function LikeButton({
       }
     } finally {
       if (isMountedRef.current) {
-        setLoading(false);
+        // setLoading(false);
       }
     }
-  };
+  }, [videoCode, userId]);
 
   const handleLike = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault();

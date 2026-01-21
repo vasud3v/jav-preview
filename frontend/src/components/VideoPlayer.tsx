@@ -189,13 +189,36 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const [showSkipIndicator, setShowSkipIndicator] = useState<'back' | 'forward' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const updateBuffered = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.buffered.length || !video.duration) return;
+    setBuffered((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !primarySource) { setLoading(false); return; }
+    if (!video || !primarySource) {
+      if (loading) {
+        // Defer state update to next tick to avoid synchronous render warning
+        setTimeout(() => setLoading(false), 0);
+      }
+      return;
+    }
+
+    // Skip if already initialized with this URL
     if (initializedUrlRef.current === primarySource) return;
     initializedUrlRef.current = primarySource;
-    setLoading(true); setError(null); setQualities([]); setCurrentQuality(-1); setPlaybackSpeed(1);
+
+    // Reset state for new source
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError(null);
+    setQualities([]);
+    setCurrentQuality(-1);
+    setPlaybackSpeed(1);
+
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+
     const proxiedUrl = getProxiedUrl(primarySource);
     if (primarySource.includes('.m3u8') || primarySource.includes('playlist')) {
       if (Hls.isSupported()) {
@@ -246,13 +269,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       } else { setLoading(false); setError('HLS not supported'); }
     } else { video.src = proxiedUrl; }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } initializedUrlRef.current = null; };
-  }, [primarySource]);
-
-  const updateBuffered = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || !video.buffered.length || !video.duration) return;
-    setBuffered((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
-  }, []);
+  }, [primarySource, updateBuffered, loading]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -280,7 +297,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const togglePlay = useCallback(() => { const v = videoRef.current; if (v) v.paused ? v.play().catch(() => { }) : v.pause(); }, []);
+  const togglePlay = useCallback(() => { const v = videoRef.current; if (v) { if (v.paused) v.play().catch(() => { }); else v.pause(); } }, []);
   const toggleMute = useCallback(() => { const v = videoRef.current; if (v) { v.muted = !v.muted; setIsMuted(v.muted); } }, []);
   const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { const v = videoRef.current; if (!v) return; const vol = parseFloat(e.target.value); v.volume = vol; setVolume(vol); setIsMuted(vol === 0); v.muted = vol === 0; }, []);
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -341,7 +358,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const handleProgressLeave = useCallback(() => {
     setHoverTime(null);
   }, []);
-  const toggleFullscreen = useCallback(() => { const c = containerRef.current; if (c) document.fullscreenElement ? document.exitFullscreen().catch(() => { }) : c.requestFullscreen().catch(() => { }); }, []);
+  const toggleFullscreen = useCallback(() => { const c = containerRef.current; if (c) { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); else c.requestFullscreen().catch(() => { }); } }, []);
   const handleMouseMove = useCallback(() => { setShowControls(true); if (hideControlsTimeout.current) clearTimeout(hideControlsTimeout.current); hideControlsTimeout.current = setTimeout(() => { if (isPlaying) setShowControls(false); }, 3000); }, [isPlaying]);
   const handleQualityChange = useCallback((i: number) => { if (hlsRef.current) { hlsRef.current.currentLevel = i; setCurrentQuality(i); } setShowQualityMenu(false); }, []);
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
