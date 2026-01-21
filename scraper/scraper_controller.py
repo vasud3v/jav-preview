@@ -23,7 +23,7 @@ from utils import extract_code_from_url, code_to_url
 class ScraperController:
     """Main orchestrator that coordinates all scraper components."""
     
-    VALID_MODES = ['full', 'incremental', 'retry-failed', 'date-range', 'codes', 'random']
+    VALID_MODES = ['full', 'incremental', 'retry-failed', 'date-range', 'codes', 'random', 'cast']
     
     def __init__(self, config: Optional[ScraperConfig] = None):
         """
@@ -94,6 +94,8 @@ class ScraperController:
                 return self._run_specific_codes()
             elif mode == "random":
                 return self._run_random_extraction()
+            elif mode == "cast":
+                return self._run_cast_extraction()
         except Exception as e:
             print(f"Extraction failed: {e}")
             return self._create_result(

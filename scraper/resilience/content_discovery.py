@@ -205,3 +205,187 @@ class ContentDiscovery:
             if code:
                 codes.append(code)
         return codes
+
+    def get_all_cast_urls(self) -> List[str]:
+        """
+        Discovers all cast URLs across all pages.
+
+        Returns:
+            List of all cast URLs found
+        """
+        self.scraper._ensure_driver()
+
+        # Load first page to find pagination info
+        url = f"{self.BASE_URL}/casts"
+        self.scraper.driver.get(url)
+        time.sleep(5)
+
+        soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+        # Look for pagination links to find max page
+        max_page = 1
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            match = re.search(r'\?page=(\d+)', href)
+            if match:
+                page_num = int(match.group(1))
+                max_page = max(max_page, page_num)
+
+        print(f"Discovered {max_page} total cast pages")
+
+        all_urls: Set[str] = set()
+
+        for page in range(1, max_page + 1):
+            print(f"Discovering cast page {page}/{max_page}...")
+
+            page_url = f"{self.BASE_URL}/casts?page={page}"
+            self.scraper.driver.get(page_url)
+            time.sleep(5)
+
+            soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if href.startswith('/casts/'):
+                    full_url = f"{self.BASE_URL}{href}"
+                    if full_url not in all_urls:
+                        all_urls.add(full_url)
+
+            print(f"  Found {len(all_urls)} total casts")
+
+        return list(all_urls)
+
+    def get_video_urls_for_cast(self, cast_url: str) -> List[str]:
+        """
+        Get video URLs from a specific cast listing page.
+
+        Args:
+            cast_url: Cast page URL to fetch
+
+        Returns:
+            List of video URLs found on page
+        """
+        self.scraper._ensure_driver()
+
+        self.scraper.driver.get(cast_url)
+        time.sleep(5)
+
+        soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+        max_page = 1
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            match = re.search(r'\?page=(\d+)', href)
+            if match:
+                page_num = int(match.group(1))
+                max_page = max(max_page, page_num)
+
+        all_urls: Set[str] = set()
+
+        for page in range(1, max_page + 1):
+            page_url = f"{cast_url}?page={page}"
+            self.scraper.driver.get(page_url)
+            time.sleep(5)
+
+            soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if href.startswith('/video/'):
+                    full_url = f"{self.BASE_URL}{href}"
+                    if full_url not in all_urls:
+                        all_urls.add(full_url)
+
+        return list(all_urls)
+
+    def get_all_cast_urls(self) -> List[str]:
+        """
+        Discovers all cast URLs across all pages.
+
+        Returns:
+            List of all cast URLs found
+        """
+        self.scraper._ensure_driver()
+
+        # Load first page to find pagination info
+        url = f"{self.BASE_URL}/casts"
+        self.scraper.driver.get(url)
+        time.sleep(5)
+
+        soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+        # Look for pagination links to find max page
+        max_page = 1
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            match = re.search(r'\?page=(\d+)', href)
+            if match:
+                page_num = int(match.group(1))
+                max_page = max(max_page, page_num)
+
+        print(f"Discovered {max_page} total cast pages")
+
+        all_urls: Set[str] = set()
+
+        for page in range(1, max_page + 1):
+            print(f"Discovering cast page {page}/{max_page}...")
+
+            page_url = f"{self.BASE_URL}/casts?page={page}"
+            self.scraper.driver.get(page_url)
+            time.sleep(5)
+
+            soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if href.startswith('/casts/'):
+                    full_url = f"{self.BASE_URL}{href}"
+                    if full_url not in all_urls:
+                        all_urls.add(full_url)
+
+            print(f"  Found {len(all_urls)} total casts")
+
+        return list(all_urls)
+
+    def get_video_urls_for_cast(self, cast_url: str) -> List[str]:
+        """
+        Get video URLs from a specific cast listing page.
+
+        Args:
+            cast_url: Cast page URL to fetch
+
+        Returns:
+            List of video URLs found on page
+        """
+        self.scraper._ensure_driver()
+
+        self.scraper.driver.get(cast_url)
+        time.sleep(5)
+
+        soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+        max_page = 1
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            match = re.search(r'\?page=(\d+)', href)
+            if match:
+                page_num = int(match.group(1))
+                max_page = max(max_page, page_num)
+
+        all_urls: Set[str] = set()
+
+        for page in range(1, max_page + 1):
+            page_url = f"{cast_url}?page={page}"
+            self.scraper.driver.get(page_url)
+            time.sleep(5)
+
+            soup = BeautifulSoup(self.scraper.driver.page_source, 'html.parser')
+
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if href.startswith('/video/'):
+                    full_url = f"{self.BASE_URL}{href}"
+                    if full_url not in all_urls:
+                        all_urls.add(full_url)
+
+        return list(all_urls)
