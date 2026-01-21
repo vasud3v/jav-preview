@@ -365,6 +365,12 @@ async def get_videos(
     return await _paginate(items, total, page, page_size)
 
 
+def _sanitize_query_param(query: str) -> str:
+    """Sanitize query parameter for PostgREST."""
+    # Replace characters that might break PostgREST syntax
+    return query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+
+
 async def search_videos(query: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
     """Search videos by title, code, or description."""
     client = get_supabase_rest()
@@ -374,7 +380,8 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    safe_query = _sanitize_query_param(query)
+    search_term = f'*{safe_query.strip()}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -728,70 +735,9 @@ async def get_classics(page: int = 1, page_size: int = 10) -> PaginatedResponse:
 async def get_home_feed(user_id: str) -> HomeFeedResponse:
     """
     OPTIMIZED: Get a unified home feed with videos for each section.
-    Fetches all ratings and likes once, then reuses them across all sections.
+    Fetches all ratings and likes only for the videos being displayed.
     """
     client = get_supabase_rest()
-    
-    # OPTIMIZATION 1: Fetch ALL ratings and likes ONCE at the start
-    print("[HOME_FEED] Fetching all ratings and likes...")
-    all_ratings_data = await client.get(
-        'video_ratings',
-        select='video_code,rating',
-        limit=5000,
-        use_admin=True
-    )
-    
-    all_likes_data = await client.get(
-        'video_likes',
-        select='video_code',
-        limit=10000,
-        use_admin=True
-    )
-    
-    # Pre-calculate rating stats
-    from collections import defaultdict, Counter
-    rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
-    if all_ratings_data:
-        for rating in all_ratings_data:
-            code = rating.get('video_code')
-            rating_val = rating.get('rating', 0)
-            rating_stats[code]['sum'] += rating_val
-            rating_stats[code]['count'] += 1
-    
-    # Pre-calculate like counts
-    from collections import Counter as CounterClass
-    like_counts = CounterClass()
-    if all_likes_data:
-        like_counts = CounterClass(like['video_code'] for like in all_likes_data)
-    
-    print(f"[HOME_FEED] Loaded {len(rating_stats)} videos with ratings, {len(like_counts)} videos with likes")
-    print(f"[HOME_FEED] like_counts type: {type(like_counts).__name__}")
-    
-    # Helper to process videos (reuses pre-fetched ratings and likes)
-    async def process_section(videos: List[dict], limit: int = 0) -> List[VideoListItem]:
-        result = []
-        section_videos = []
-        for v in videos:
-            code = v.get('code')
-            if code:
-                section_videos.append(v)
-                if limit > 0 and len(section_videos) >= limit:
-                    break
-        
-        # Use pre-fetched ratings and likes
-        for v in section_videos:
-            code = v['code']
-            rating_info = None
-            if code in rating_stats:
-                stats = rating_stats[code]
-                rating_info = {
-                    'average': round(stats['sum'] / stats['count'], 1),
-                    'count': stats['count']
-                }
-            like_count = like_counts.get(code, 0)
-            result.append(await _video_to_list_item(v, rating_info, like_count))
-        
-        return result
     
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
@@ -863,83 +809,44 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
         total_score = view_score + quality_bonus + like_ratio_bonus + engagement_score + recency_bonus
         return total_score
 
-    # 1. TOP RATED - Get videos with best ratings (OPTIMIZED: use pre-fetched ratings)
+    # 1. TOP RATED
+    # Since we can't efficiently get global top rated without pre-fetching all ratings,
+    # we will use a hybrid approach: fetch high-view videos, then check their ratings.
+    # This is an approximation but much more scalable.
     top_rated_candidates = []
     try:
-        print("[TOP_RATED] Using pre-fetched ratings...")
-        
-        if rating_stats:
-            # Get videos with best ratings (min threshold)
-            top_codes = sorted(
-                [(code, stats['sum'] / stats['count'], stats['count']) 
-                 for code, stats in rating_stats.items() if stats['count'] >= MIN_RATINGS_FOR_TOP_RATED],
-                key=lambda x: (x[1], x[2]),  # Sort by avg rating, then count
-                reverse=True
-            )[:TOP_RATED_BATCH_SIZE]
-            
-            print(f"[TOP_RATED] Videos meeting threshold: {len(top_codes)}")
-            
-            # OPTIMIZATION: Fetch all videos in one query using 'in' filter
-            if top_codes:
-                codes_list = [code for code, _, _ in top_codes]
-                codes_filter = ','.join(f'"{code}"' for code in codes_list)
-                top_rated_candidates = await client.get(
-                    'videos',
-                    select='code,title,thumbnail_url,duration,release_date,studio,views',
-                    filters={'code': f'in.({codes_filter})'}
-                )
-                print(f"[TOP_RATED] Fetched {len(top_rated_candidates) if top_rated_candidates else 0} videos in bulk")
-        
-        # If no ratings, use fallback
-        if not top_rated_candidates:
-            print("[TOP_RATED] Using fallback")
-            top_rated_candidates = await client.get(
-                'videos',
-                select='code,title,thumbnail_url,duration,release_date,studio,views',
-                order='views.desc',
-                limit=TOP_RATED_BATCH_SIZE,
-                offset=150
-            )
-    except Exception as e:
-        print(f"[TOP_RATED] Error: {e}")
-        import traceback
-        traceback.print_exc()
+        # Fetch candidates based on views (proxy for popularity/potential ratings)
+        # Try offset 100 first to skip the absolute most popular (likely in Popular section)
         top_rated_candidates = await client.get(
             'videos',
             select='code,title,thumbnail_url,duration,release_date,studio,views',
             order='views.desc',
-            limit=TOP_RATED_BATCH_SIZE,
-            offset=150
+            limit=TOP_RATED_BATCH_SIZE * 2, # Fetch more to filter
+            offset=100
         )
+        
+        # If we didn't get enough candidates (small DB), fetch from the top
+        if not top_rated_candidates or len(top_rated_candidates) < 5:
+             top_rated_candidates = await client.get(
+                'videos',
+                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                order='views.desc',
+                limit=TOP_RATED_BATCH_SIZE * 2,
+                offset=0
+            )
+    except Exception as e:
+        print(f"[TOP_RATED] Error: {e}")
     
-    top_rated = await process_section(top_rated_candidates or [], 0)
-    print(f"[TOP_RATED] Final: {len(top_rated)} videos")
-
     # 2. FEATURED - High quality recent content with good engagement
-    # Fetch videos with both thumbnail and cover (quality indicator)
     featured_candidates = await client.get(
         'videos',
-        select='code,title,thumbnail_url,cover_url,duration,release_date,studio,views',
+        select='code,title,thumbnail_url,cover_url,duration,release_date,studio,views,scraped_at',
         filters={'thumbnail_url': 'neq.', 'cover_url': 'neq.'},
         order='scraped_at.desc',
         limit=FEATURED_BATCH_SIZE
     )
     
-    # Get like counts for featured candidates
-    if featured_candidates:
-        featured_codes = [v['code'] for v in featured_candidates]
-        featured_likes = await _get_likes_for_videos(featured_codes)
-        
-        # Score and sort by quality (including like ratio)
-        for video in featured_candidates:
-            like_count = featured_likes.get(video['code'], 0)
-            video['_score'] = calculate_quality_score(video, like_count)
-        featured_candidates.sort(key=lambda x: x['_score'], reverse=True)
-    
-    featured = await process_section(featured_candidates or [], 0)  # No limit
-    
-    # 3. TRENDING - Recent content with growing engagement
-    # Prioritize videos from last 30 days with good view velocity AND like velocity
+    # 3. TRENDING - Recent content
     from datetime import datetime, timedelta
     thirty_days_ago = (datetime.now() - timedelta(days=TRENDING_WINDOW_DAYS)).isoformat()
     
@@ -951,62 +858,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
         limit=TRENDING_BATCH_SIZE
     )
     
-    # Get like counts for trending candidates
-    if trending_candidates:
-        trending_codes = [v['code'] for v in trending_candidates]
-        trending_likes = await _get_likes_for_videos(trending_codes)
-        
-        # Enhanced trending score calculation
-        for video in trending_candidates:
-            days_old = days_since_release(video.get('scraped_at', ''))
-            views = video.get('views', 0)
-            likes = trending_likes.get(video['code'], 0)
-            
-            # Prevent division by zero
-            days_old = max(days_old, 0.5)  # Minimum 0.5 days
-            
-            # Calculate velocities
-            view_velocity = views / days_old
-            like_velocity = likes / days_old
-            
-            # Engagement rate (likes per view)
-            engagement_rate = (likes / views * 100) if views > 0 else 0
-            
-            # Combined velocity with enhanced like weight
-            combined_velocity = (view_velocity * VIEW_VELOCITY_WEIGHT) + (like_velocity * LIKE_WEIGHT_IN_TRENDING * 100)
-            
-            # Engagement bonus for high engagement
-            engagement_bonus = 1.0
-            if engagement_rate > 10:  # Exceptional
-                engagement_bonus = 2.0
-            elif engagement_rate > 5:  # High
-                engagement_bonus = 1.5
-            elif engagement_rate > 2:  # Good
-                engagement_bonus = 1.2
-            
-            # Recency boost - more aggressive for very recent content
-            if days_old < 1:  # Less than 1 day
-                recency_boost = RECENCY_BOOST_FACTOR * 3
-            elif days_old < 3:  # Less than 3 days
-                recency_boost = RECENCY_BOOST_FACTOR * 2
-            elif days_old < 7:  # Less than a week
-                recency_boost = RECENCY_BOOST_FACTOR * 1.5
-            else:
-                recency_boost = 1 + (TRENDING_WINDOW_DAYS - min(days_old, TRENDING_WINDOW_DAYS)) / TRENDING_WINDOW_DAYS
-            
-            # Quality bonus for complete content
-            quality_multiplier = 1.0
-            if video.get('thumbnail_url') and video.get('duration'):
-                quality_multiplier = 1.2
-            
-            # Final trending score
-            video['_score'] = combined_velocity * recency_boost * engagement_bonus * quality_multiplier
-            
-        trending_candidates.sort(key=lambda x: x['_score'], reverse=True)
-    
-    trending = await process_section(trending_candidates or [], 0)  # No limit
-    print(f"[TRENDING] Final section has {len(trending)} videos")
-    
     # 4. POPULAR - All-time most viewed content
     popular_candidates = await client.get(
         'videos',
@@ -1014,13 +865,9 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
         order='views.desc',
         limit=POPULAR_BATCH_SIZE
     )
-    print(f"[POPULAR] Fetched {len(popular_candidates) if popular_candidates else 0} candidates")
-    popular = await process_section(popular_candidates or [], 0)  # No limit
-    print(f"[POPULAR] Final section has {len(popular)} videos")
     
     # 5. NEW RELEASES - Recently released content (last 90 days)
     ninety_days_ago = (datetime.now() - timedelta(days=NEW_RELEASES_WINDOW_DAYS)).isoformat()
-    print(f"[NEW_RELEASES] Looking for videos after {ninety_days_ago}")
     new_releases_candidates = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
@@ -1028,155 +875,171 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
         order='release_date.desc',
         limit=NEW_RELEASES_BATCH_SIZE
     )
-    print(f"[NEW_RELEASES] Fetched {len(new_releases_candidates) if new_releases_candidates else 0} candidates")
-    new_releases = await process_section(new_releases_candidates or [], 0)  # No limit
-    print(f"[NEW_RELEASES] Final section has {len(new_releases)} videos")
     
-    # 6. CLASSICS - Older content (>2 years) with proven quality
-    # Get classics with good engagement and ratings
+    # 6. CLASSICS - Older content (>2 years)
     two_years_ago = (datetime.now() - timedelta(days=365 * CLASSICS_AGE_YEARS)).isoformat()
-    
-    print(f"[CLASSICS] Looking for videos older than {two_years_ago}")
-    
-    # First try with minimum views requirement
     classics_candidates = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={'release_date': f'lt.{two_years_ago}', 'views': f'gte.{MIN_VIEWS_FOR_FEATURED}'},
+        filters={'release_date': f'lt.{two_years_ago}'},
         order='views.desc',
         limit=CLASSICS_BATCH_SIZE
     )
     
-    print(f"[CLASSICS] Found {len(classics_candidates) if classics_candidates else 0} videos with {MIN_VIEWS_FOR_FEATURED}+ views")
+    # 7. MOST LIKED (Approximation via Recent Highly Viewed)
+    # Getting "Most Liked" globally is expensive. We'll use Trending candidates and sort by likes.
+    # We can also fetch some high-view candidates specifically for this if needed.
+    most_liked_candidates = []
+    if trending_candidates:
+         most_liked_candidates.extend(trending_candidates)
     
-    # If no results, try without minimum views requirement
-    if not classics_candidates or len(classics_candidates) == 0:
-        print(f"[CLASSICS] Trying without minimum views requirement...")
-        classics_candidates = await client.get(
-            'videos',
-            select='code,title,thumbnail_url,duration,release_date,studio,views',
-            filters={'release_date': f'lt.{two_years_ago}'},
-            order='views.desc',
-            limit=CLASSICS_BATCH_SIZE
-        )
-        print(f"[CLASSICS] Found {len(classics_candidates) if classics_candidates else 0} videos without view filter")
+    # --- UNIFIED METADATA FETCHING ---
     
-    # If still no results, try with 1 year instead of 2
-    if not classics_candidates or len(classics_candidates) == 0:
-        one_year_ago = (datetime.now() - timedelta(days=365)).isoformat()
-        print(f"[CLASSICS] Trying with 1 year threshold: {one_year_ago}")
-        classics_candidates = await client.get(
-            'videos',
-            select='code,title,thumbnail_url,duration,release_date,studio,views',
-            filters={'release_date': f'lt.{one_year_ago}'},
-            order='views.desc',
-            limit=CLASSICS_BATCH_SIZE
-        )
-        print(f"[CLASSICS] Found {len(classics_candidates) if classics_candidates else 0} videos older than 1 year")
+    # Collect all unique video codes
+    all_codes = set()
+    for v in top_rated_candidates or []: all_codes.add(v['code'])
+    for v in featured_candidates or []: all_codes.add(v['code'])
+    for v in trending_candidates or []: all_codes.add(v['code'])
+    for v in popular_candidates or []: all_codes.add(v['code'])
+    for v in new_releases_candidates or []: all_codes.add(v['code'])
+    for v in classics_candidates or []: all_codes.add(v['code'])
+    # (most_liked_candidates share codes with trending)
     
-    # Score classics by views and quality
-    if classics_candidates:
-        classics_codes = [v['code'] for v in classics_candidates]
-        classics_section_likes = await _get_likes_for_videos(classics_codes)
+    print(f"[HOME_FEED] Fetching metadata for {len(all_codes)} unique videos...")
+
+    # Batch fetch ratings and likes
+    all_codes_list = list(all_codes)
+    ratings_map = {}
+    likes_map = {}
+
+    if all_codes_list:
+        # Split into chunks if too many (PostgREST url limit)
+        chunk_size = 100
+        for i in range(0, len(all_codes_list), chunk_size):
+            chunk = all_codes_list[i:i+chunk_size]
+            r = await _get_ratings_for_videos(chunk)
+            l = await _get_likes_for_videos(chunk)
+            ratings_map.update(r)
+            likes_map.update(l)
+
+    # --- SCORING AND PROCESSING ---
+
+    async def process_and_convert(videos, limit=0):
+        # Convert to list items using fetched metadata
+        items = []
+        for v in videos:
+            code = v['code']
+            rating_info = ratings_map.get(code)
+            like_count = likes_map.get(code, 0)
+            items.append(await _video_to_list_item(v, rating_info, like_count))
+
+        if limit > 0:
+            return items[:limit]
+        return items
+
+    # 1. Process Top Rated (Sort by fetched ratings)
+    if top_rated_candidates:
+        for v in top_rated_candidates:
+            code = v['code']
+            stats = ratings_map.get(code, {'average': 0, 'count': 0})
+            # Weighted rating (Bayesian average could be better but simple avg + count threshold is ok)
+            v['_rating_score'] = stats['average'] if stats['count'] >= MIN_RATINGS_FOR_TOP_RATED else 0
         
-        for video in classics_candidates:
+        top_rated_candidates.sort(key=lambda x: x.get('_rating_score', 0), reverse=True)
+    top_rated = await process_and_convert(top_rated_candidates, 0)
+
+    # 2. Process Featured
+    if featured_candidates:
+        for v in featured_candidates:
+            like_count = likes_map.get(v['code'], 0)
+            v['_score'] = calculate_quality_score(v, like_count)
+        featured_candidates.sort(key=lambda x: x['_score'], reverse=True)
+    featured = await process_and_convert(featured_candidates, 0)
+
+    # 3. Process Trending
+    if trending_candidates:
+        for video in trending_candidates:
+            days_old = days_since_release(video.get('scraped_at', ''))
             views = video.get('views', 0)
-            likes = classics_section_likes.get(video['code'], 0)
+            likes = likes_map.get(video['code'], 0) # Use batch fetched likes
+            
+            days_old = max(days_old, 0.5)
+            view_velocity = views / days_old
+            like_velocity = likes / days_old
+            engagement_rate = (likes / views * 100) if views > 0 else 0
+            
+            combined_velocity = (view_velocity * VIEW_VELOCITY_WEIGHT) + (like_velocity * LIKE_WEIGHT_IN_TRENDING * 100)
+            
+            engagement_bonus = 1.0
+            if engagement_rate > 10: engagement_bonus = 2.0
+            elif engagement_rate > 5: engagement_bonus = 1.5
+            elif engagement_rate > 2: engagement_bonus = 1.2
+            
+            recency_boost = 1.0
+            if days_old < 1: recency_boost = RECENCY_BOOST_FACTOR * 3
+            elif days_old < 3: recency_boost = RECENCY_BOOST_FACTOR * 2
+            elif days_old < 7: recency_boost = RECENCY_BOOST_FACTOR * 1.5
+
+            quality_multiplier = 1.2 if (video.get('thumbnail_url') and video.get('duration')) else 1.0
+
+            video['_score'] = combined_velocity * recency_boost * engagement_bonus * quality_multiplier
+        
+        trending_candidates.sort(key=lambda x: x['_score'], reverse=True)
+    trending = await process_and_convert(trending_candidates, 0)
+    
+    # 4. Popular (Already sorted by views from DB)
+    popular = await process_and_convert(popular_candidates, 0)
+    
+    # 5. New Releases
+    new_releases = await process_and_convert(new_releases_candidates, 0)
+    
+    # 6. Classics
+    if classics_candidates:
+         for video in classics_candidates:
+            views = video.get('views', 0)
+            likes = likes_map.get(video['code'], 0)
             has_thumbnail = bool(video.get('thumbnail_url'))
             has_duration = bool(video.get('duration'))
             
-            # Base score from views
             import math
             base_score = math.log10(max(views, 1) + 1) * 20
             
-            # Quality multiplier
-            quality = 1.0
-            if has_thumbnail:
-                quality += 0.3
-            if has_duration:
-                quality += 0.2
-            
-            # Engagement bonus
+            quality = 1.0 + (0.3 if has_thumbnail else 0) + (0.2 if has_duration else 0)
             engagement = (likes / views * 100) if views > 0 else 0
-            engagement_bonus = min(engagement * 5, 50)  # Cap at 50
+            engagement_bonus = min(engagement * 5, 50)
             
             video['_score'] = (base_score * quality) + engagement_bonus
-        
-        classics_candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
+         classics_candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
+    classics = await process_and_convert(classics_candidates, 0)
     
-    classics = await process_section(classics_candidates or [], 0)  # No limit
-    
-    print(f"[CLASSICS] Final section has {len(classics)} videos")
+    # 7. Most Liked (derived from high-engagement candidates)
+    # We reuse trending/popular candidates and sort by likes
+    if most_liked_candidates:
+        # Create a copy to not mess up trending order
+        most_liked_candidates = list(most_liked_candidates)
+        # Add some popular ones too if not present
+        seen_codes = set(v['code'] for v in most_liked_candidates)
+        for v in popular_candidates:
+            if v['code'] not in seen_codes:
+                most_liked_candidates.append(v)
+                seen_codes.add(v['code'])
 
-    
-    # 7. MOST LIKED - Videos with highest like counts (OPTIMIZED: use pre-fetched likes)
-    most_liked = []
-    try:
-        print(f"[MOST_LIKED] Using pre-fetched likes...")
-        print(f"[MOST_LIKED] like_counts type: {type(like_counts)}, length: {len(like_counts)}")
-        
-        if like_counts:
-            print(f"[MOST_LIKED] Top 5 most liked: {like_counts.most_common(5)}")
-            
-            # Get top liked video codes (at least 2 likes)
-            top_liked_codes = [code for code, count in like_counts.most_common(MOST_LIKED_BATCH_SIZE) if count >= 2]
-            
-            print(f"[MOST_LIKED] Videos with 2+ likes: {len(top_liked_codes)}")
-            print(f"[MOST_LIKED] Codes: {top_liked_codes}")
-            
-            if top_liked_codes:
-                # OPTIMIZATION: Fetch all videos in one query
-                codes_filter = ','.join(f'"{code}"' for code in top_liked_codes)
-                print(f"[MOST_LIKED] Filter: in.({codes_filter})")
-                
-                most_liked_candidates = await client.get(
-                    'videos',
-                    select='code,title,thumbnail_url,duration,release_date,studio,views',
-                    filters={'code': f'in.({codes_filter})'}
-                )
-                
-                print(f"[MOST_LIKED] Fetched {len(most_liked_candidates) if most_liked_candidates else 0} videos in bulk")
-                
-                if most_liked_candidates:
-                    print(f"[MOST_LIKED] Candidate codes: {[v['code'] for v in most_liked_candidates]}")
-                    
-                    # Score by like count, engagement rate, and quality
-                    import math
-                    for video in most_liked_candidates:
-                        code = video['code']
-                        likes = like_counts[code]
-                        views = video.get('views', 0)
-                        
-                        like_score = math.log10(max(likes, 1) + 1) * 30
-                        engagement_rate = (likes / views * 100) if views > 0 else 0
-                        engagement_score = min(engagement_rate * 10, 100)
-                        
-                        quality_bonus = 0
-                        if video.get('thumbnail_url'):
-                            quality_bonus += 10
-                        if video.get('duration'):
-                            quality_bonus += 10
-                        
-                        view_bonus = math.log10(max(views, 1) + 1) * 5
-                        video['_score'] = like_score + engagement_score + quality_bonus + view_bonus
-                    
-                    most_liked_candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
-                    
-                    print(f"[MOST_LIKED] Calling process_section with {len(most_liked_candidates)} candidates")
-                    most_liked = await process_section(most_liked_candidates, 0)
-                    print(f"[MOST_LIKED] process_section returned {len(most_liked)} videos")
-                    print(f"[MOST_LIKED] Final: {len(most_liked)} videos")
-                else:
-                    print("[MOST_LIKED] No videos fetched from database")
-            else:
-                print("[MOST_LIKED] No videos with 2+ likes")
-        else:
-            print("[MOST_LIKED] like_counts is empty or falsy")
-    except Exception as e:
-        print(f"[MOST_LIKED] Error: {e}")
-        import traceback
-        traceback.print_exc()
-    
+        # Score by likes
+        for v in most_liked_candidates:
+            likes = likes_map.get(v['code'], 0)
+            views = v.get('views', 0)
+            import math
+            like_score = math.log10(max(likes, 1) + 1) * 30
+            engagement_rate = (likes / views * 100) if views > 0 else 0
+
+            v['_like_score'] = like_score + min(engagement_rate * 10, 100)
+
+        most_liked_candidates.sort(key=lambda x: x.get('_like_score', 0), reverse=True)
+        # Filter to those with at least some likes
+        most_liked_candidates = [v for v in most_liked_candidates if likes_map.get(v['code'], 0) > 0]
+
+    most_liked = await process_and_convert(most_liked_candidates[:MOST_LIKED_BATCH_SIZE], 0)
+
     print(f"[HOME_FEED] Returning: Featured={len(featured)}, Trending={len(trending)}, Popular={len(popular)}, TopRated={len(top_rated)}, MostLiked={len(most_liked)}, NewReleases={len(new_releases)}, Classics={len(classics)}")
     
     return HomeFeedResponse(
@@ -1860,7 +1723,7 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
 
     # Sanitize query to prevent filter syntax errors
     # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    safe_query = _sanitize_query_param(query)
     search_term = f'*{safe_query.strip()}*'
 
     # Fetch videos matching query (larger limit for facets)
@@ -2026,7 +1889,9 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = _sanitize_query_param(query)
+        search_term = f'*{safe_query.strip()}*'
+        filters['or'] = f'(code.ilike.{search_term},title.ilike.{search_term},description.ilike.{search_term})'
     
     # Determine order
     order_map = {
@@ -2438,6 +2303,30 @@ async def get_related_videos(
 
     # Fetch Candidates
 
+    # Helper to manage candidates and avoid duplicates while boosting scores
+    # seen_codes contains excluded videos (source + history)
+    # candidates list contains selected videos
+
+    def add_or_boost(video, weight):
+        code = video['code']
+        # If explicitly excluded (watched/source), skip
+        # Note: We check candidates first because seen_codes contains both excluded and processed candidates
+
+        # Check if it's already a candidate (added by previous step)
+        for cand in candidates:
+            if cand['code'] == code:
+                cand['_score'] += weight
+                return
+
+        # If not a candidate but in seen_codes, it means it's excluded (source or history)
+        if code in seen_codes:
+            return
+
+        # New candidate
+        video['_score'] = weight
+        candidates.append(video)
+        seen_codes.add(code)
+
     # A. Same Series (Strongest signal)
     if source_series:
         series_videos = await client.get(
@@ -2448,10 +2337,7 @@ async def get_related_videos(
         )
         if series_videos:
             for v in series_videos:
-                if v['code'] not in seen_codes:
-                    v['_score'] = w_series
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                add_or_boost(v, w_series)
 
     # B. Same Studio
     if source_studio:
@@ -2463,10 +2349,7 @@ async def get_related_videos(
         )
         if studio_videos:
             for v in studio_videos:
-                if v['code'] not in seen_codes:
-                    v['_score'] = w_studio
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                add_or_boost(v, w_studio)
 
     # C. Same Cast
     if cast:
@@ -2477,21 +2360,25 @@ async def get_related_videos(
                  junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
                  if junctions:
                      codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+
+                     # Identify which ones are new and which are existing candidates
+                     codes_to_fetch = []
+                     for c in codes:
+                         if c in seen_codes:
+                             # Try to boost if it's a candidate
+                             for cand in candidates:
+                                 if cand['code'] == c:
+                                     cand['_score'] += w_cast
+                                     break
+                         else:
+                             codes_to_fetch.append(c)
+
+                     if codes_to_fetch:
+                         codes_filter = ','.join(f'"{c}"' for c in codes_to_fetch)
                          cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
                          if cast_vids:
                              for v in cast_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
+                                 add_or_boost(v, w_cast)
 
     # D. Same Categories
     if categories:
@@ -2502,20 +2389,25 @@ async def get_related_videos(
                  junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
                  if junctions:
                      codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+
+                     # Identify which ones are new and which are existing candidates
+                     codes_to_fetch = []
+                     for c in codes:
+                         if c in seen_codes:
+                             # Try to boost if it's a candidate
+                             for cand in candidates:
+                                 if cand['code'] == c:
+                                     cand['_score'] += w_cat
+                                     break
+                         else:
+                             codes_to_fetch.append(c)
+
+                     if codes_to_fetch:
+                         codes_filter = ','.join(f'"{c}"' for c in codes_to_fetch)
                          cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
                          if cat_vids:
                              for v in cat_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cat
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cat
+                                 add_or_boost(v, w_cat)
 
     # Refine Scores
     import math
