@@ -2005,36 +2005,63 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
                                 seen_codes.add(code)
         
         # Strategy 4: Same cast
-        for cast_name, _ in top_cast:
-            # Get cast ID
-            cast_data = await client.get(
+        if top_cast:
+            # Batch get cast IDs
+            cast_names = [name.replace('"', '') for name, _ in top_cast]  # Basic sanitization
+            cast_names_filter = ','.join(f'"{name}"' for name in cast_names)
+            cast_data_list = await client.get(
                 'cast_members',
-                filters={'name': f'eq.{cast_name}'},
-                limit=1
+                select='id,name',
+                filters={'name': f'in.({cast_names_filter})'}
             )
-            if cast_data:
-                cast_id = cast_data[0]['id']
-                # Get videos with this cast
-                cast_videos = await client.get(
+
+            if cast_data_list:
+                # Map cast_id to name for processing order if needed, or just get IDs
+                cast_ids = [c['id'] for c in cast_data_list]
+                cast_ids_filter = ','.join(f'"{cid}"' for cid in cast_ids)
+
+                # Batch get videos for these cast members (limit per cast handled in Python)
+                all_cast_videos = await client.get(
                     'video_cast',
-                    select='video_code',
-                    filters={'cast_id': f'eq.{cast_id}'},
-                    limit=15
+                    select='video_code,cast_id',
+                    filters={'cast_id': f'in.({cast_ids_filter})'},
+                    limit=200  # Fetch enough to allow filtering in Python
                 )
-                if cast_videos:
-                    for cv in cast_videos[:10]:
-                        code = cv['video_code']
-                        if code not in seen_codes:
-                            video = await client.get(
-                                'videos',
-                                select='code,title,thumbnail_url,duration,release_date,studio,views',
-                                filters={'code': f'eq.{code}'},
-                                limit=1
-                            )
-                            if video:
-                                video[0]['_score'] = WEIGHT_CAST
-                                candidates.append(video[0])
-                                seen_codes.add(code)
+
+                if all_cast_videos:
+                    # Group videos by cast_id
+                    from collections import defaultdict
+                    videos_by_cast = defaultdict(list)
+                    for cv in all_cast_videos:
+                        videos_by_cast[cv['cast_id']].append(cv['video_code'])
+
+                    # Select videos preserving diversity (limit per cast)
+                    potential_codes = []
+                    for cast_id in cast_ids: # Iterate in order of fetched cast (or could be original top_cast order if we mapped it)
+                        if cast_id in videos_by_cast:
+                            # Take up to 10 videos per cast member, matching original logic
+                            for code in videos_by_cast[cast_id][:10]:
+                                if code not in seen_codes:
+                                    potential_codes.append(code)
+                                    seen_codes.add(code)
+
+                    # Batch get video details
+                    if potential_codes:
+                        # Fetch in chunks if too many, but limit total recommendations from cast to reasonable number
+                        # The original code did not limit the *total* candidates from cast, but practically it was 3 * 10 = 30 max.
+                        potential_codes = potential_codes[:40]
+                        codes_filter = ','.join(f'"{c}"' for c in potential_codes)
+
+                        videos_details = await client.get(
+                            'videos',
+                            select='code,title,thumbnail_url,duration,release_date,studio,views',
+                            filters={'code': f'in.({codes_filter})'}
+                        )
+
+                        if videos_details:
+                            for v in videos_details:
+                                v['_score'] = WEIGHT_CAST
+                                candidates.append(v)
         
         # 8. Score and rank candidates
         import math
