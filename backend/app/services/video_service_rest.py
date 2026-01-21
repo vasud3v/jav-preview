@@ -280,8 +280,10 @@ async def get_video(code: str) -> Optional[VideoResponse]:
     """Get single video by code."""
     client = get_supabase_rest()
     
+    # Use resource embedding to fetch video, categories, and cast in a single request
     video = await client.get(
         'videos',
+        select='*,video_categories(categories(name)),video_cast(cast_members(name))',
         filters={'code': f'eq.{code}'},
         single=True
     )
@@ -289,9 +291,20 @@ async def get_video(code: str) -> Optional[VideoResponse]:
     if not video:
         return None
     
-    # Get categories and cast
-    categories = await _get_video_categories(client, code)
-    cast = await _get_video_cast(client, code)
+    # Process nested categories
+    categories = []
+    if video.get('video_categories'):
+        for vc in video.get('video_categories'):
+            if vc.get('categories') and vc['categories'].get('name'):
+                categories.append(vc['categories']['name'])
+
+    # Process nested cast
+    cast = []
+    if video.get('video_cast'):
+        for vc in video.get('video_cast'):
+            if vc.get('cast_members') and vc['cast_members'].get('name'):
+                cast.append(vc['cast_members']['name'])
+
     video['_categories'] = categories
     video['_cast'] = cast
     
