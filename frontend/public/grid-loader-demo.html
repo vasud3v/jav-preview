@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grid Loader Demo - Pull to Refresh</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #09090b;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .demo-container {
+      text-align: center;
+      max-width: 600px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    p {
+      color: #a1a1aa;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .loader-showcase {
+      background: #18181b;
+      border-radius: 12px;
+      padding: 60px 40px;
+      margin-bottom: 30px;
+      border: 1px solid #27272a;
+    }
+
+    /* Grid Loader Styles */
+    .grid-loader-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .grid-loader {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      transform: rotate(45deg);
+      padding: 8px;
+    }
+
+    .cube {
+      width: 20px;
+      height: 20px;
+      background: #ff0040;
+      border-radius: 2px;
+      animation: cubeScale 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      box-shadow: 0 0 12px rgba(255, 0, 64, 0.4);
+      transform: scale(0);
+      opacity: 0;
+    }
+
+    @keyframes cubeScale {
+      0% {
+        transform: scale(0);
+        opacity: 0;
+      }
+      50% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(0);
+        opacity: 0;
+      }
+    }
+
+    /* Staggered animation delays */
+    .cube:nth-child(1) { animation-delay: 0.1s; }
+    .cube:nth-child(2) { animation-delay: 0.2s; }
+    .cube:nth-child(3) { animation-delay: 0.3s; }
+    .cube:nth-child(4) { animation-delay: 0.4s; }
+    .cube:nth-child(5) { animation-delay: 0.5s; }
+    .cube:nth-child(6) { animation-delay: 0.6s; }
+    .cube:nth-child(7) { animation-delay: 0.7s; }
+    .cube:nth-child(8) { animation-delay: 0.8s; }
+    .cube:nth-child(9) { animation-delay: 0.9s; }
+
+    .status-text {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #a1a1aa;
+      font-weight: 500;
+    }
+
+    .features {
+      text-align: left;
+      background: #18181b;
+      border-radius: 12px;
+      padding: 30px;
+      border: 1px solid #27272a;
+    }
+
+    .features h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #fff;
+    }
+
+    .features ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .features li {
+      padding: 10px 0;
+      color: #a1a1aa;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .features li::before {
+      content: "✓";
+      color: #ff0040;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .note {
+      margin-top: 30px;
+      padding: 20px;
+      background: rgba(255, 0, 64, 0.1);
+      border: 1px solid rgba(255, 0, 64, 0.2);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fca5a5;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1>Grid Loader - Pull to Refresh</h1>
+    <p>This animated grid loader is now integrated into your pull-to-refresh component</p>
+
+    <div class="loader-showcase">
+      <div class="grid-loader-container">
+        <div class="grid-loader">
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+          <div class="cube"></div>
+        </div>
+      </div>
+      <div class="status-text">Refreshing...</div>
+    </div>
+
+    <div class="features">
+      <h2>Features</h2>
+      <ul>
+        <li>Smooth staggered animation with 9 cubes</li>
+        <li>Scales based on pull distance (0-100%)</li>
+        <li>Rotated 45° for dynamic effect</li>
+        <li>Uses your theme's primary color</li>
+        <li>Responsive sizing (18px mobile, 20px desktop)</li>
+        <li>Continuous animation when refreshing</li>
+        <li>Glowing shadow effect</li>
+      </ul>
+    </div>
+
+    <div class="note">
+      <strong>How it works:</strong> When you pull down on the home page, this loader will appear and scale up as you pull. Once you release, it will animate continuously while refreshing your feed.
+    </div>
+  </div>
+</body>
+</html>

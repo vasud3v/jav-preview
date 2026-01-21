@@ -7,6 +7,59 @@ from app.core.supabase_rest_client import get_supabase_rest
 router = APIRouter(prefix="/likes", tags=["likes"])
 
 
+@router.get("/batch")
+async def get_like_status_batch(
+    codes: str = Query(..., description="Comma-separated video codes"),
+    user_id: str = Query(...)
+):
+    """
+    Get like status and count for multiple videos in one request.
+    Optimized for performance - reduces API calls.
+    
+    Returns: { results: [{ code, liked, like_count }, ...] }
+    """
+    client = get_supabase_rest()
+    
+    # Parse codes
+    video_codes = [code.strip() for code in codes.split(',') if code.strip()]
+    
+    if not video_codes:
+        return {"results": []}
+    
+    # Limit to prevent abuse
+    video_codes = video_codes[:50]
+    
+    # Get all user likes for these videos in one query
+    codes_filter = ','.join(f'"{code}"' for code in video_codes)
+    user_likes = await client.get(
+        "video_likes",
+        filters={
+            "video_code": f"in.({codes_filter})",
+            "user_id": f"eq.{user_id}"
+        }
+    )
+    
+    # Create set of liked codes for fast lookup
+    liked_codes = set(like["video_code"] for like in user_likes) if user_likes else set()
+    
+    # Get like counts for all videos
+    # Note: This could be optimized further with a custom SQL query
+    results = []
+    for code in video_codes:
+        like_count = await client.count(
+            "video_likes",
+            filters={"video_code": f"eq.{code}"}
+        )
+        
+        results.append({
+            "code": code,
+            "liked": code in liked_codes,
+            "like_count": like_count
+        })
+    
+    return {"results": results}
+
+
 @router.get("/{video_code}")
 async def get_like_status(
     video_code: str,

@@ -581,7 +581,7 @@ export default function SearchResults() {
       {/* Results Grid */}
       {!loading && videos.length > 0 && (
         <>
-          <VideoGrid videos={videos} columns={6} />
+          <VideoGrid videos={videos} columns={6} virtual={true} />
 
           {/* Pagination */}
           {totalPages > 1 && (

@@ -56,14 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.signIn(email, password);
     setUser(response.user);
     
-    // Merge anonymous history into logged-in user account
+    // Merge anonymous history into logged-in user account (non-blocking)
     if (response.user?.id && anonId) {
       const loggedInUserId = `user_${response.user.id}`;
-      try {
-        await api.mergeHistory(anonId, loggedInUserId);
-      } catch (err) {
-        console.error('Failed to merge history:', err);
-      }
+      // Run merge in background, don't block login
+      api.mergeHistory(anonId, loggedInUserId)
+        .then((result) => {
+          console.log('History merged successfully:', result);
+        })
+        .catch((err) => {
+          console.error('Failed to merge history (non-critical):', err);
+          // Non-critical error - user is still logged in
+        });
     }
   }, []);
 

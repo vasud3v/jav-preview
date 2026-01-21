@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { ZLoader, InlineLoader } from './Loading';
+import { BouncingLoader, InlineLoader } from './Loading';
 
 interface SkeletonProps {
   className?: string;
@@ -20,7 +20,7 @@ export function Skeleton({ className }: SkeletonProps) {
 export function Loader({ text, size = 'md' }: { text?: string; size?: 'sm' | 'md' | 'lg' }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <ZLoader size={size} />
+      <BouncingLoader size={size} />
       {text && <p className="text-white/50 text-xs">{text}</p>}
     </div>
   );

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Clock, Film, User, Building2, Grid3X3 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { WifiLoader } from './Loading';
+import { PulsatingLoader } from './Loading';
 import { useNeonColor } from '@/context/NeonColorContext';
 
 interface Suggestion {
@@ -200,7 +200,7 @@ export default function SearchInput({
         <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
           {loading ? (
             <div className="py-8 flex justify-center">
-              <WifiLoader />
+              <PulsatingLoader size="md" />
             </div>
           ) : suggestions.length > 0 ? (
             <div className="py-1">

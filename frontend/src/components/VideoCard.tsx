@@ -1,35 +1,24 @@
+/**
+ * Optimized Video Card
+ * Uses lazy loading with single intersection observer
+ */
+
 import { useState, memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, Eye, Star, Film } from 'lucide-react';
-import { useNeonColor } from '@/context/NeonColorContext';
 import type { VideoListItem } from '@/lib/api';
 import { proxyImageUrl } from '@/lib/api';
+import OptimizedImage from './OptimizedImage';
 import LikeButton from './LikeButton';
 
 interface VideoCardProps {
   video: VideoListItem;
   onClick?: (code: string) => void;
   highlightColor?: string;
+  priority?: 'high' | 'normal' | 'low';
 }
 
-// Known placeholder image patterns from source sites
-const PLACEHOLDER_PATTERNS = [
-  'nowprinting',
-  'now_printing',
-  'noimage',
-  'no_image',
-  'placeholder',
-  'coming_soon',
-  'comingsoon'
-];
-
-const isPlaceholderImage = (url: string | null | undefined): boolean => {
-  if (!url) return true;
-  const lowerUrl = url.toLowerCase();
-  return PLACEHOLDER_PATTERNS.some(pattern => lowerUrl.includes(pattern));
-};
-
-// Memoized formatters outside component to avoid recreation
+// Memoized formatters
 const formatViews = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
@@ -37,27 +26,57 @@ const formatViews = (num: number): string => {
 };
 
 const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  } catch {
+    return '';
+  }
 };
 
-const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: VideoCardProps) {
+const isPlaceholderImage = (url: string | null | undefined): boolean => {
+  if (!url) return true;
+  const lowerUrl = url.toLowerCase();
+  return ['nowprinting', 'now_printing', 'noimage', 'no_image', 'placeholder', 'coming_soon', 'comingsoon']
+    .some(pattern => lowerUrl.includes(pattern));
+};
+
+const VideoCard = memo(function VideoCard({ 
+  video, 
+  onClick, 
+  highlightColor,
+  priority = 'normal'
+}: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
-  const { color } = useNeonColor();
 
   // Memoize computed values
   const hasValidThumbnail = useMemo(
-    () => video.thumbnail_url && !isPlaceholderImage(video.thumbnail_url) && !imageError,
+    () => {
+      if (!video.thumbnail_url) return false;
+      if (imageError) return false;
+      if (isPlaceholderImage(video.thumbnail_url)) return false;
+      // Check if URL is actually a valid URL
+      try {
+        const url = video.thumbnail_url.trim();
+        return url.length > 0 && (url.startsWith('http') || url.startsWith('/'));
+      } catch {
+        return false;
+      }
+    },
     [video.thumbnail_url, imageError]
   );
 
   const thumbnailUrl = useMemo(
-    () => hasValidThumbnail ? proxyImageUrl(video.thumbnail_url) : null,
+    () => {
+      if (!hasValidThumbnail) return null;
+      return proxyImageUrl(video.thumbnail_url);
+    },
     [hasValidThumbnail, video.thumbnail_url]
   );
 
@@ -76,29 +95,30 @@ const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: Vi
     }
   }, [onClick, video.code, navigate]);
 
-  const handleImageError = useCallback(() => setImageError(true), []);
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+  }, []);
 
   return (
     <div className="group cursor-pointer" onClick={handleClick}>
       {/* Thumbnail */}
-      <div className="relative rounded-lg overflow-hidden mb-2 bg-muted aspect-[2/3]">
-        {thumbnailUrl ? (
-          <img
+      <div className="relative rounded-lg overflow-hidden mb-2 aspect-[2/3] bg-gradient-to-br from-zinc-900 to-zinc-800">
+        {thumbnailUrl && !imageError ? (
+          <OptimizedImage
             src={thumbnailUrl}
             alt={video.title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-            decoding="async"
             onError={handleImageError}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-            <Film className="w-8 h-8 text-muted-foreground/50" />
-            <span className="text-[10px] text-muted-foreground font-medium">No Image</span>
+          /* Fallback when no image or error */
+          <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 to-zinc-800">
+            <Film className="w-8 h-8 text-gray-500" />
+            <span className="text-[10px] text-gray-400 font-medium">No Image</span>
           </div>
         )}
 
-        {/* Hover overlay with glass play button */}
+        {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center">
             <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
@@ -106,10 +126,12 @@ const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: Vi
         </div>
 
         {/* Views badge */}
-        <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
-          <Eye className="w-3 h-3" />
-          {formattedViews}
-        </span>
+        {video.views > 0 && (
+          <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
+            <Eye className="w-3 h-3" />
+            {formattedViews}
+          </span>
+        )}
 
         {/* Duration badge */}
         {video.duration && (
@@ -132,10 +154,17 @@ const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: Vi
             </p>
           )}
           <div className="flex items-center gap-2">
-            {/* Like button */}
-            <div className="flex items-center gap-0.5">
-              <LikeButton videoCode={video.code} size="sm" showCount={true} />
-            </div>
+            {/* Like button - only show if video has likes */}
+            {video.like_count > 0 && (
+              <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                <LikeButton 
+                  videoCode={video.code} 
+                  size="sm" 
+                  showCount={true}
+                  initialLikeCount={video.like_count || 0}
+                />
+              </div>
+            )}
 
             {/* Rating */}
             {video.rating_avg > 0 && (
@@ -156,6 +185,17 @@ const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: Vi
         </div>
       </div>
     </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison for better memoization
+  return (
+    prevProps.video.code === nextProps.video.code &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url &&
+    prevProps.video.views === nextProps.video.views &&
+    prevProps.video.like_count === nextProps.video.like_count &&
+    prevProps.video.rating_avg === nextProps.video.rating_avg &&
+    prevProps.highlightColor === nextProps.highlightColor &&
+    prevProps.priority === nextProps.priority
   );
 });
 

@@ -53,7 +53,23 @@ export default function VideoSection({
     );
   }
 
-  if (videos.length === 0) return null;
+  if (videos.length === 0) {
+    return (
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="transition-transform duration-300">
+              {icon}
+            </span>
+            <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          </div>
+        </div>
+        <div className="text-center py-8 text-muted-foreground text-sm">
+          No videos available in this section yet
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-6 group/section">
@@ -152,7 +168,12 @@ export default function VideoSection({
               className="flex-shrink-0 w-[120px] sm:w-[130px] md:w-[135px] lg:w-[140px] xl:w-[145px] transition-all duration-300 hover:scale-[1.02]"
               style={{ animationDelay: `${index * 50}ms` }}
             >
-              <VideoCard video={video} onClick={onVideoClick} highlightColor={highlightColor} />
+              <VideoCard 
+                video={video} 
+                onClick={onVideoClick} 
+                highlightColor={highlightColor}
+                priority={index < 6 ? 'high' : 'normal'}
+              />
             </div>
           ))}
         </div>

@@ -97,11 +97,17 @@ export function useCachedApi<T>(
         setLoading(false);
       }
     } catch (err) {
+      console.error('API fetch error:', err);
       if (isMountedRef.current) {
-        // If we have stale data, keep showing it
+        // If we have stale data, keep showing it with error indicator
         if (!cached) {
-          setError((err as Error).message);
+          setData(null);
+          setError((err as Error).message || 'Failed to fetch data');
+        } else {
+          // Keep stale data but show error
+          setError((err as Error).message || 'Failed to refresh data');
         }
+        setIsStale(false);
         setLoading(false);
       }
     }

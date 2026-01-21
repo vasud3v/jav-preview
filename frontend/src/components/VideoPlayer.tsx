@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { Play, Pause, Volume2, VolumeX, Volume1, Maximize, Minimize, Settings, SkipBack, SkipForward } from 'lucide-react';
 import { useNeonColor } from '@/context/NeonColorContext';
-import { FaceLoader } from './Loading';
+import { PulsatingLoader } from './Loading';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -202,25 +202,23 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
-          // Aggressive buffering for smoother playback
-          maxBufferLength: 180,           // Buffer 3 minutes ahead (was 60)
-          maxMaxBufferLength: 600,        // Allow up to 10 minutes buffer (was 120)
-          maxBufferSize: 300 * 1000 * 1000, // 300MB buffer (was 120MB)
-          maxBufferHole: 0.5,             // Allow larger gaps (was 0.1)
-          startFragPrefetch: true,        // Prefetch next segment
-          testBandwidth: false,           // Skip bandwidth test
-          abrEwmaDefaultEstimate: 30000000, // Assume 30Mbps (was 20)
-          fragLoadingTimeOut: 30000,      // Longer timeout (was 20000)
-          manifestLoadingTimeOut: 15000,  // Longer manifest timeout (was 10000)
-          levelLoadingTimeOut: 15000,     // Longer level timeout (was 10000)
-          fragLoadingMaxRetry: 6,         // More retries (was 4)
+          // Balanced buffering for smooth playback without over-buffering
+          maxBufferLength: 60,            // Buffer 1 minute ahead (reduced from 180)
+          maxMaxBufferLength: 120,        // Max 2 minutes buffer (reduced from 600)
+          maxBufferSize: 100 * 1000 * 1000, // 100MB buffer (reduced from 300MB)
+          maxBufferHole: 0.5,
+          startFragPrefetch: true,
+          testBandwidth: false,
+          abrEwmaDefaultEstimate: 20000000, // Assume 20Mbps (reduced from 30)
+          fragLoadingTimeOut: 20000,      // 20s timeout (reduced from 30)
+          manifestLoadingTimeOut: 10000,  // 10s manifest timeout (reduced from 15)
+          levelLoadingTimeOut: 10000,     // 10s level timeout (reduced from 15)
+          fragLoadingMaxRetry: 4,         // 4 retries (reduced from 6)
           startLevel: -1,                 // Auto select best quality
           capLevelToPlayerSize: true,
-          backBufferLength: 300,          // Keep 5 minutes back buffer (was 90)
-          // Progressive loading - load more aggressively
+          backBufferLength: 90,           // Keep 90s back buffer (reduced from 300)
           progressive: true,
-          // High buffer goal for less rebuffering
-          highBufferWatchdogPeriod: 3,
+          highBufferWatchdogPeriod: 2,    // Reduced from 3
         });
         hlsRef.current = hls;
         hls.loadSource(proxiedUrl);
@@ -314,11 +312,13 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     if (isDragging) {
       document.addEventListener('mousemove', handleDragMove);
       document.addEventListener('mouseup', handleDragEnd);
-      return () => {
-        document.removeEventListener('mousemove', handleDragMove);
-        document.removeEventListener('mouseup', handleDragEnd);
-      };
     }
+    
+    // Always cleanup on unmount or when dragging changes
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+    };
   }, [isDragging, handleDragMove, handleDragEnd]);
 
   const skip = useCallback((seconds: number) => {
@@ -407,7 +407,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       {/* Loading overlay */}
       {loading && !error && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 pointer-events-none">
-          <FaceLoader />
+          <PulsatingLoader size="lg" />
         </div>
       )}
 
@@ -734,7 +734,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       </div>
 
       {/* Global styles */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{__html: `
         .wave-path {
           animation: waveFlow 2s linear infinite;
         }
@@ -742,7 +742,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
           0% { transform: translateX(0); }
           100% { transform: translateX(-24px); }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }

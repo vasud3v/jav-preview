@@ -79,9 +79,9 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
   const addReplyToTree = (comments: Comment[], parentId: number, newReply: Comment): Comment[] => {
     return comments.map(c => {
       if (c.id === parentId) {
-        return { ...c, replies: [...c.replies, newReply] };
+        return { ...c, replies: [...(c.replies || []), newReply] };
       }
-      if (c.replies.length > 0) {
+      if (c.replies && c.replies.length > 0) {
         return { ...c, replies: addReplyToTree(c.replies, parentId, newReply) };
       }
       return c;
@@ -94,7 +94,7 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
       if (c.id === commentId) {
         return { ...c, ...updates };
       }
-      if (c.replies.length > 0) {
+      if (c.replies && c.replies.length > 0) {
         return { ...c, replies: updateCommentInTree(c.replies, commentId, updates) };
       }
       return c;
@@ -107,7 +107,7 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
       .filter(c => c.id !== commentId)
       .map(c => ({
         ...c,
-        replies: c.replies.length > 0 ? removeCommentFromTree(c.replies, commentId) : c.replies
+        replies: (c.replies && c.replies.length > 0) ? removeCommentFromTree(c.replies, commentId) : (c.replies || [])
       }));
   };
 
@@ -117,7 +117,7 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
       if (c.id === commentId) {
         return { ...c, is_deleted: true, content: '[deleted]' };
       }
-      if (c.replies.length > 0) {
+      if (c.replies && c.replies.length > 0) {
         return { ...c, replies: markDeletedInTree(c.replies, commentId) };
       }
       return c;

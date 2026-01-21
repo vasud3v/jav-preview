@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
 interface NeonColor {
@@ -197,6 +197,7 @@ function generatePalette(primary: NeonColor): NeonColor[] {
 export function NeonColorProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [color, setColor] = useState<NeonColor>(() => generateNeonColor());
+  const lastPathRef = useRef(location.pathname);
 
   const complementary = useMemo(() => getComplementaryColor(color), [color]);
   const palette = useMemo(() => generatePalette(color), [color]);
@@ -206,8 +207,11 @@ export function NeonColorProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Generate new unique color on each page change
-    setColor(generateNeonColor());
+    // Only generate new color if path actually changed (not just query params)
+    if (lastPathRef.current !== location.pathname) {
+      lastPathRef.current = location.pathname;
+      setColor(generateNeonColor());
+    }
   }, [location.pathname]);
 
   // Apply CSS custom properties for easy access throughout the app

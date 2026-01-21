@@ -52,6 +52,10 @@ export default function VideoDetail() {
 
   useEffect(() => {
     if (!code) return;
+    
+    // Track if this effect is still valid (prevent race conditions)
+    let isCurrent = true;
+    
     setVideo(null); setLoading(true); setError(null); setGalleryOpen(false);
     setRating({ average: 0, count: 0 }); // Reset rating when video changes
     setCurrentImage(0); // Reset gallery index when video changes
@@ -63,24 +67,56 @@ export default function VideoDetail() {
     setSeenCodes([]);
 
     api.getVideo(code).then(data => {
-      setVideo(data);
+      if (!isCurrent) return; // Ignore if navigated away
+      
+      // Increment view count if this is a new video view
       if (viewRef.current !== code) {
         viewRef.current = code;
+        
+        // Optimistically update view count in UI
+        const updatedData = { ...data, views: (data.views || 0) + 1 };
+        setVideo(updatedData);
+        
+        // Send increment to backend (fire and forget)
         api.incrementView(code).catch(() => { });
+        
         // Record watch for recommendations (disabled - backend issue causes 404)
         // const watchUserId = getAnonymousUserId();
         // api.recordWatch(code, watchUserId).catch(() => {});
+      } else {
+        // Not a new view, just set the data
+        setVideo(data);
       }
-    }).catch(() => setError('Failed to load')).finally(() => setLoading(false));
+    }).catch(() => {
+      if (!isCurrent) return;
+      setError('Failed to load');
+    }).finally(() => {
+      if (!isCurrent) return;
+      setLoading(false);
+    });
 
     // Fetch rating (anonymous users can rate)
     const ratingUserId = getAnonymousUserId();
-    api.getRating(code, ratingUserId).then(setRating).catch(() => { });
+    api.getRating(code, ratingUserId).then(rating => {
+      if (!isCurrent) return;
+      setRating(rating);
+    }).catch(() => { });
 
     // Fetch personalized recommendations
     setRelatedLoading(true);
     const userId = getAnonymousUserId();
-    api.getRelatedVideos(code, userId, 12).then(setRelatedVideos).catch(() => { }).finally(() => setRelatedLoading(false));
+    api.getRelatedVideos(code, userId, 12).then(videos => {
+      if (!isCurrent) return;
+      setRelatedVideos(videos);
+    }).catch(() => { }).finally(() => {
+      if (!isCurrent) return;
+      setRelatedLoading(false);
+    });
+    
+    // Cleanup function to prevent race conditions
+    return () => {
+      isCurrent = false;
+    };
   }, [code]);
 
   // Fetch bookmark status when user changes or code changes
@@ -555,6 +591,7 @@ export default function VideoDetail() {
               <div className="flex justify-center">
                 <button
                   onClick={async () => {
+                    // Prevent duplicate requests
                     if (discoverLoading) return;
                     setDiscoverLoading(true);
                     try {
@@ -568,12 +605,14 @@ export default function VideoDetail() {
                         setDiscoverBatch(prev => prev + 1);
                       }
                       setHasMoreDiscover(result.has_more && result.items.length > 0);
-                    } catch {
+                    } catch (err) {
+                      console.error('Failed to load more:', err);
                       setHasMoreDiscover(false);
                     } finally {
                       setDiscoverLoading(false);
                     }
                   }}
+                  disabled={discoverLoading}
                   className="group p-2 rounded-full transition-all duration-300 cursor-pointer hover:scale-110 active:scale-95"
                   style={{
                     borderWidth: 1,
@@ -797,7 +836,7 @@ export default function VideoDetail() {
                   className="flex gap-1 justify-center overflow-x-auto py-2"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
-                  <style>{`.thumbnail-scroll::-webkit-scrollbar { display: none; }`}</style>
+                  <style dangerouslySetInnerHTML={{__html: `.thumbnail-scroll::-webkit-scrollbar { display: none; }`}} />
                   {allGalleryImages.map((img, i) => (
                     <button
                       key={i}
@@ -828,12 +867,12 @@ export default function VideoDetail() {
         </div>
       )}
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes progress {
           from { width: 0%; }
           to { width: 100%; }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }

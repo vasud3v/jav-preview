@@ -1,0 +1,76 @@
+/* Pulsating Ring Loader - Professional & Optimized */
+.pulsating-loader-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  contain: layout style paint;
+}
+
+.pulsating-ring {
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  opacity: 0;
+  animation: pulsate 1.5s ease-out infinite;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+@keyframes pulsate {
+  0% {
+    transform: scale3d(0.1, 0.1, 1);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale3d(1.2, 1.2, 1);
+    opacity: 0;
+  }
+}
+
+/* Size variants */
+.pulsating-loader-wrapper.size-sm {
+  width: 24px;
+  height: 24px;
+}
+
+.pulsating-loader-wrapper.size-sm .pulsating-ring {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.pulsating-loader-wrapper.size-md {
+  width: 32px;
+  height: 32px;
+}
+
+.pulsating-loader-wrapper.size-md .pulsating-ring {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.pulsating-loader-wrapper.size-lg {
+  width: 48px;
+  height: 48px;
+}
+
+.pulsating-loader-wrapper.size-lg .pulsating-ring {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+/* Prevent layout shift */
+.pulsating-loader-wrapper::before {
+  content: '';
+  display: block;
+  padding-bottom: 100%;
+}

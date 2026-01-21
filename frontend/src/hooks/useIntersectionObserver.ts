@@ -37,7 +37,10 @@ export function useIntersectionObserver({
 
         observer.observe(node);
 
-        return () => observer.disconnect();
+        // Always cleanup observer, even if frozen
+        return () => {
+            observer.disconnect();
+        };
     }, [elementRef, JSON.stringify(threshold), root, rootMargin, frozen]);
 
     return [elementRef, !!entry?.isIntersecting || frozen];

@@ -187,7 +187,7 @@ export default function LikeButtonStyled({
         </span>
       )}
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         .heart-container {
           --heart-color: rgb(239, 68, 68);
           position: relative;
@@ -436,7 +436,7 @@ export default function LikeButtonStyled({
             transform: translate(-50%, 50%) translateY(-88px) translateX(45px) scale(0.3) rotate(40deg);
           }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }

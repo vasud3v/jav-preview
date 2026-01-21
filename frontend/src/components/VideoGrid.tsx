@@ -10,7 +10,12 @@ interface VideoGridProps {
   columns?: 'auto' | 4 | 5 | 6 | 7;
 }
 
-const VideoGrid = memo(function VideoGrid({ videos, loading, onVideoClick, columns = 'auto' }: VideoGridProps) {
+const VideoGrid = memo(function VideoGrid({ 
+  videos, 
+  loading, 
+  onVideoClick, 
+  columns = 'auto'
+}: VideoGridProps) {
   if (loading) {
     return <VideoGridSkeleton />;
   }
@@ -34,8 +39,13 @@ const VideoGrid = memo(function VideoGrid({ videos, loading, onVideoClick, colum
 
   return (
     <div className={gridClasses[columns]}>
-      {videos.map((video) => (
-        <VideoCard key={video.code} video={video} onClick={onVideoClick} />
+      {videos.map((video, index) => (
+        <VideoCard 
+          key={video.code} 
+          video={video} 
+          onClick={onVideoClick}
+          priority={index < 20 ? 'high' : 'normal'}
+        />
       ))}
     </div>
   );

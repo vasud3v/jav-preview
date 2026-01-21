@@ -7,6 +7,7 @@ interface LikeButtonProps {
   size?: 'sm' | 'md' | 'lg';
   showCount?: boolean;
   className?: string;
+  initialLikeCount?: number;
 }
 
 /**
@@ -17,10 +18,11 @@ export default function LikeButton({
   videoCode, 
   size = 'md', 
   showCount = true,
-  className = '' 
+  className = '',
+  initialLikeCount = 0
 }: LikeButtonProps) {
   const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(initialLikeCount);
   const [loading, setLoading] = useState(true);
   const [animationKey, setAnimationKey] = useState(0);
   const [isPending, setIsPending] = useState(false);
@@ -36,46 +38,64 @@ export default function LikeButton({
 
   const config = sizeConfig[size];
 
-  // Load initial like status
+  // Load initial like status - ONLY when user hovers or interacts
   useEffect(() => {
     isMountedRef.current = true;
-    loadLikeStatus();
+    
+    // Update local count when initialLikeCount changes
+    setLikeCount(Math.max(0, initialLikeCount));
+    
+    // If we have an initial count, we can skip loading and just show it
+    if (initialLikeCount > 0) {
+      setLoading(false);
+    }
     
     return () => {
       isMountedRef.current = false;
     };
-  }, [videoCode, userId]);
+  }, [videoCode, userId, initialLikeCount]);
 
-  const loadLikeStatus = async () => {
-    if (!videoCode) {
-      setLoading(false);
-      return;
-    }
+  // Lazy load like status on first interaction
+  const loadLikeStatus = useCallback(async () => {
+    if (!videoCode || !loading) return; // Skip if already loaded
     
     try {
+      // Use optimized batch API - only fetch user's like status
       const data = await api.getLikeStatus(videoCode, userId);
       if (isMountedRef.current) {
         setLiked(data.liked);
-        setLikeCount(Math.max(0, data.like_count || 0));
+        // Only update count if we don't have an initial count or if the fetched count is different
+        if (initialLikeCount === 0 || data.like_count !== initialLikeCount) {
+          setLikeCount(Math.max(0, data.like_count || 0));
+        }
       }
     } catch (err) {
       console.error('Failed to load like status:', err);
       if (isMountedRef.current) {
         setLiked(false);
-        setLikeCount(0);
+        // Keep initial count on error
+        if (initialLikeCount === 0) {
+          setLikeCount(0);
+        }
       }
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  };
+  }, [videoCode, userId, loading, initialLikeCount]);
 
-  const handleLike = useCallback(async (e: React.MouseEvent) => {
+  const handleLike = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (isPending || !videoCode) return;
+
+    // Load like status on first interaction if not loaded yet
+    if (loading) {
+      await loadLikeStatus();
+      return; // Let user click again after loading
+    }
 
     setIsPending(true);
 
@@ -96,6 +116,20 @@ export default function LikeButton({
       if (isMountedRef.current) {
         setLiked(data.liked);
         setLikeCount(Math.max(0, data.like_count || 0));
+        
+        // Invalidate cache to refresh video cards
+        try {
+          const { invalidateCache } = await import('@/hooks/useApi');
+          invalidateCache('home:');
+          invalidateCache('video:');
+          invalidateCache('cast:');
+          invalidateCache('studio:');
+          invalidateCache('category:');
+          invalidateCache('series:');
+        } catch (err) {
+          // Cache invalidation is optional
+          console.debug('Cache invalidation skipped:', err);
+        }
       }
     } catch (err) {
       console.error('Failed to toggle like:', err);
@@ -108,7 +142,7 @@ export default function LikeButton({
         setIsPending(false);
       }
     }
-  }, [isPending, liked, likeCount, videoCode, userId]);
+  }, [isPending, liked, likeCount, videoCode, userId, loading, loadLikeStatus]);
 
   const formatCount = (count: number): string => {
     const safeCount = Math.max(0, count || 0);
@@ -186,17 +220,18 @@ export default function LikeButton({
         </div>
       </div>
 
-      {/* Count - simple text, no circle */}
+      {/* Count - white text, heart stays colored */}
       {showCount && likeCount > 0 && (
         <span 
-          className={`absolute ${config.count} font-bold leading-none transition-all duration-300 pointer-events-none select-none`}
+          className={`absolute ${config.count} font-medium leading-none transition-all duration-300 pointer-events-none select-none`}
           style={{
-            color: 'white',
+            color: '#ffffff',
             top: config.countOffset.top,
             right: config.countOffset.right,
-            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
             minWidth: '10px',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontWeight: '500'
           }}
           aria-label={`${likeCount} likes`}
         >
@@ -204,7 +239,7 @@ export default function LikeButton({
         </span>
       )}
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         .heart-container {
           --heart-color: rgb(239, 68, 68);
           position: relative;
@@ -243,7 +278,7 @@ export default function LikeButton({
         }
 
         .svg-outline {
-          fill: white;
+          fill: #ef4444;
           opacity: 0.9;
           filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8));
         }
@@ -251,13 +286,14 @@ export default function LikeButton({
         .heart-container:hover .svg-outline {
           opacity: 1;
           transform: scale(1.15);
+          filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.8));
         }
 
         .svg-filled {
           color: #ef4444;
           animation: heart-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
           display: none;
-          filter: drop-shadow(0 0 4px #ef4444) drop-shadow(0 0 8px #ef4444);
+          filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8)) drop-shadow(0 0 10px rgba(239, 68, 68, 0.6));
           transition: all 0.2s ease;
         }
 
@@ -453,7 +489,7 @@ export default function LikeButton({
             transform: translate(-50%, 50%) translateY(-88px) translateX(45px) scale(0.3) rotate(40deg);
           }
         }
-      `}</style>
+      `}} />
     </div>
   );
 }

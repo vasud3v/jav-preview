@@ -22,8 +22,17 @@ async def get_home_feed(
     """
     Get unified home feed with distinct videos for each section.
     Prevents duplicates across Featured, Trending, Popular, New, and Classics.
+    Cached for better performance.
     """
-    return await video_service.get_home_feed(user_id)
+    # Use cache for home feed
+    cache_key = f"home_feed:{user_id}"
+    cached = videos_list_cache.get(cache_key)
+    if cached:
+        return cached
+    
+    result = await video_service.get_home_feed(user_id)
+    videos_list_cache.set(cache_key, result)
+    return result
 
 
 @router.get("/user/bookmarks", response_model=PaginatedResponse)

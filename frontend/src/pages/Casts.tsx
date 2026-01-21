@@ -15,21 +15,21 @@ export default function Casts() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
+  // Fetch all cast members with images
+  // Only updates on manual page reload or cache expiry (30 minutes)
   const castData = useCachedApi<CastWithImage[]>(
     () => api.getAllCastWithImagesDirect(),
-    { cacheKey: 'cast:all', ttl: CACHE_TTL.LONG }
+    { 
+      cacheKey: 'cast:all', 
+      ttl: CACHE_TTL.LONG, // 30 minutes cache
+      staleWhileRevalidate: false // Don't auto-refresh in background
+    }
   );
 
   const { data: cast, loading } = castData;
 
-  // Auto-refresh periodically
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      castData.refetch();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(intervalId);
-  }, [castData]);
+  // Note: No auto-refresh - data only updates on manual page reload
+  // This ensures stable browsing experience
 
   const filtered = useMemo(() => 
     (cast ?? []).filter(c => c.name.toLowerCase().includes(search.toLowerCase())),

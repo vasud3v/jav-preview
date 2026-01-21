@@ -4,10 +4,45 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Performance optimizations -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="JAV Preview - Fast and efficient video browsing" />
+    
+    <!-- Preconnect to API for faster requests -->
+    <link rel="preconnect" href="http://localhost:8000" />
+    <link rel="dns-prefetch" href="http://localhost:8000" />
+    
     <title>JAV Preview</title>
+    
+    <!-- Critical CSS - prevent flash -->
     <style>
       /* Prevent flash during resize/drag */
-      html, body { background-color: oklch(0.1776 0 0); }
+      html, body { 
+        background-color: oklch(0.1776 0 0);
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      
+      /* Loading indicator */
+      #root:empty::before {
+        content: '';
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin: -20px 0 0 -20px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top-color: rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body>

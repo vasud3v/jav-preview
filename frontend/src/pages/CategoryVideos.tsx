@@ -84,7 +84,7 @@ export default function CategoryVideos() {
               No videos found for this category.
             </div>
           ) : (
-            <VideoGrid videos={videos} columns={6} />
+            <VideoGrid videos={videos} columns={6} virtual={true} />
           )}
 
           {totalPages > 1 && (

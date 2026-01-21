@@ -1,9 +1,15 @@
 """FastAPI application entry point - REST API mode."""
-import signal
+# Import cgi compatibility shim FIRST for Python 3.13+
 import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+import cgi_compat
+
+import signal
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
@@ -13,6 +19,9 @@ app = FastAPI(
     version=settings.api_version,
     debug=settings.debug,
 )
+
+# Add GZip compression middleware for faster responses
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,15 +56,67 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Import and include router AFTER health check is registered
 try:
+    print("[STARTUP] Importing Supabase REST client...")
     from app.core.supabase_rest_client import get_supabase_rest, close_supabase_rest
+    print("[STARTUP] Importing API router...")
     from app.api.router import api_router
+    print(f"[STARTUP] API router prefix: {api_router.prefix}")
+    print(f"[STARTUP] API router routes: {len(api_router.routes)}")
+    print("[STARTUP] Including router in app...")
     app.include_router(api_router)
+    print(f"[STARTUP] Total app routes after router: {len(app.routes)}")
     _router_loaded = True
+    print("[STARTUP] ✓ Router loaded successfully")
 except Exception as e:
     print(f"ERROR loading router: {e}")
     traceback.print_exc()
     _router_loaded = False
     close_supabase_rest = None
+
+
+# Serve React Frontend in Production
+# This must be AFTER the API router is included so API routes take precedence
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
+
+# Calculate path to frontend/dist
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+frontend_dist = project_root / "frontend" / "dist"
+assets_path = frontend_dist / "assets"
+
+print(f"Frontend dist path: {frontend_dist}")
+print(f"Assets path: {assets_path}")
+
+if frontend_dist.exists():
+    print("✓ Found frontend build directory, serving static files")
+    
+    # Mount assets directory explicitly
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+    
+    # Catch-all route for SPA (React Router)
+    # This MUST be registered AFTER all API routes
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Allow API calls to pass through (though they should be caught by earlier routes)
+        if full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+            
+        # Check if a file exists specifically (e.g. favicon.ico, manifest.json)
+        file_path = frontend_dist / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+            
+        # Otherwise return index.html for SPA routing
+        return FileResponse(frontend_dist / "index.html")
+    
+    print(f"[STARTUP] Total app routes after frontend: {len(app.routes)}")
+else:
+    print(f"⚠ Frontend build directory not found at {frontend_dist}")
+    print("  (This is expected during local development if not built, or if running separate services)")
 
 
 @app.on_event("startup")
@@ -76,12 +137,10 @@ async def startup_event():
             print(f"⚠ Supabase connection warning: {e}")
             
     # Determine base URL for display
-    # Railway provides RAILWAY_PUBLIC_DOMAIN
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if domain:
         base_url = f"https://{domain}"
     else:
-        # Fallback to local or manually provided
         base_url = f"http://{settings.host}:{settings.port}"
         if "jav-preview-production.up.railway.app" in settings.cors_origins:
              base_url = "https://jav-preview-production.up.railway.app"
@@ -112,48 +171,3 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 if hasattr(signal, 'SIGTERM'):
     signal.signal(signal.SIGTERM, signal_handler)
-
-# Serve React Frontend in Production
-# This effectively allows backend and frontend to run in the same service/port
-import os
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pathlib import Path
-
-# Calculate path to frontend/dist (assuming running from root or backend)
-# transform: /app/backend/app/main.py -> /app/frontend/dist
-# We use resolve() to get absolute path
-current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent.parent
-frontend_dist = project_root / "frontend" / "dist"
-assets_path = frontend_dist / "assets"
-
-print(f"Frontend dist path: {frontend_dist}")
-print(f"Assets path: {assets_path}")
-
-if frontend_dist.exists():
-    print("✓ Found frontend build directory, serving static files")
-    
-    # Mount assets directory explicitly
-    # Check if assets dir exists first to avoid errors if build is partial
-    if assets_path.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
-    
-    # Catch-all route for SPA (React Router)
-    # This must be the LAST route defined
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        # Allow API calls to pass through (though they should be caught by earlier routes)
-        if full_path.startswith("api/"):
-            return JSONResponse(status_code=404, content={"detail": "Not Found"})
-            
-        # Check if a file exists specifically (e.g. favicon.ico, manifest.json)
-        file_path = frontend_dist / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-            
-        # Otherwise return index.html for SPA routing
-        return FileResponse(frontend_dist / "index.html")
-else:
-    print(f"⚠ Frontend build directory not found at {frontend_dist}")
-    print("  (This is expected during local development if not built, or if running separate services)")

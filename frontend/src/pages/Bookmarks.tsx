@@ -154,8 +154,12 @@ export default function Bookmarks() {
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {videos.map(video => (
-                <VideoCard key={video.code} video={video} />
+              {videos.map((video, index) => (
+                <VideoCard 
+                  key={video.code} 
+                  video={video}
+                  priority={index < 12 ? 'high' : 'normal'}
+                />
               ))}
             </div>
 

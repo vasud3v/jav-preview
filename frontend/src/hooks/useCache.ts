@@ -61,27 +61,30 @@ function clearOldEntries(): void {
   keysToRemove.forEach(key => sessionStorage.removeItem(key));
 }
 
-// In-memory cache for faster access (mirrors sessionStorage)
+// In-memory cache for faster access (primary cache, sessionStorage is backup)
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 
 export function getCached<T>(key: string): T | null {
-  // Check memory first
+  // Check memory first (fast path)
   const memEntry = memoryCache.get(key) as CacheEntry<T> | undefined;
-  if (memEntry && Date.now() - memEntry.timestamp <= memEntry.ttl) {
-    return memEntry.data;
+  if (memEntry) {
+    if (Date.now() - memEntry.timestamp <= memEntry.ttl) {
+      return memEntry.data;
+    }
+    // Expired in memory
+    memoryCache.delete(key);
   }
   
-  // Fall back to storage
+  // Fall back to storage only if not in memory
   const entry = getFromStorage<T>(key);
   if (!entry) return null;
   
   if (Date.now() - entry.timestamp > entry.ttl) {
     sessionStorage.removeItem(getCacheKey(key));
-    memoryCache.delete(key);
     return null;
   }
   
-  // Populate memory cache
+  // Populate memory cache for next access
   memoryCache.set(key, entry);
   return entry.data;
 }
@@ -92,8 +95,14 @@ export function setCache<T>(key: string, data: T, ttlMs: number): void {
     timestamp: Date.now(),
     ttl: ttlMs,
   };
+  // Always set in memory (fast)
   memoryCache.set(key, entry);
-  setToStorage(key, entry);
+  
+  // Debounce sessionStorage writes to reduce I/O
+  // Only write to storage for longer TTLs (> 2 minutes)
+  if (ttlMs > 2 * 60 * 1000) {
+    setToStorage(key, entry);
+  }
 }
 
 export function invalidateCache(pattern?: string): void {

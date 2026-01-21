@@ -14,6 +14,7 @@ class VideoListItem(BaseModel):
     views: int = 0
     rating_avg: float = 0
     rating_count: int = 0
+    like_count: int = 0
 
     class Config:
         from_attributes = True
@@ -59,5 +60,6 @@ class HomeFeedResponse(BaseModel):
     trending: List[VideoListItem]
     popular: List[VideoListItem]
     top_rated: List[VideoListItem]
+    most_liked: List[VideoListItem]
     new_releases: List[VideoListItem]
     classics: List[VideoListItem]

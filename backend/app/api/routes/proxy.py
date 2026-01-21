@@ -231,7 +231,7 @@ async def proxy_ts(url: str, request: Request):
 
 @router.get("/image")
 async def proxy_image(url: str):
-    """Proxy images with caching."""
+    """Proxy images with aggressive caching and optimization."""
     decoded_url = unquote(url)
     validate_url(decoded_url)
     key = cache_key(decoded_url)
@@ -253,8 +253,9 @@ async def proxy_image(url: str):
             media_type=content_type,
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=86400",
+                "Cache-Control": "public, max-age=604800, immutable",  # 7 days, immutable
                 "X-Cache": "HIT",
+                "Vary": "Accept-Encoding",
             }
         )
     
@@ -262,9 +263,9 @@ async def proxy_image(url: str):
         client = get_client()
         resp = await client.get(decoded_url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "image/*,*/*",
+            "Accept": "image/webp,image/avif,image/*,*/*;q=0.8",  # Prefer modern formats
             "Referer": "https://javtrailers.com/",
-        })
+        }, timeout=10.0)  # Add timeout
         
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail="Failed")
@@ -273,8 +274,8 @@ async def proxy_image(url: str):
         content_type = resp.headers.get("content-type", "image/jpeg")
         size = len(content)
         
-        # Cache images under 2MB
-        if size < 2 * 1024 * 1024:
+        # Cache images under 5MB (increased from 2MB)
+        if size < 5 * 1024 * 1024:
             image_cache.set(key, content, size)
         
         return Response(
@@ -282,8 +283,9 @@ async def proxy_image(url: str):
             media_type=content_type,
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=86400",
+                "Cache-Control": "public, max-age=604800, immutable",  # 7 days, immutable
                 "X-Cache": "MISS",
+                "Vary": "Accept-Encoding",
             }
         )
     except HTTPException:

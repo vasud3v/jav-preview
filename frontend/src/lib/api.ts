@@ -75,9 +75,17 @@ const TTL = {
  */
 export function proxyImageUrl(url: string | undefined | null): string {
   if (!url) return '';
+  
+  // Already proxied
+  if (url.includes('/api/proxy/image')) return url;
+  
+  // Only proxy DMM images (they have CORS issues)
   if (url.includes('pics.dmm.co.jp') || url.includes('dmm.co.jp')) {
-    return `${API_BASE}/proxy/image?url=${encodeURIComponent(url)}`;
+    const encoded = encodeURIComponent(url);
+    return `${API_BASE}/proxy/image?url=${encoded}`;
   }
+  
+  // Return other URLs as-is
   return url;
 }
 
@@ -92,6 +100,7 @@ export interface VideoListItem {
   views: number;
   rating_avg: number;
   rating_count: number;
+  like_count: number;
 }
 
 export interface VideoDetail extends VideoListItem {

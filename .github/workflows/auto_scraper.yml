@@ -1,0 +1,81 @@
+name: Video Scraper Pipeline
+
+on:
+  # Run every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      max_videos:
+        description: 'Max videos per run'
+        required: false
+        default: '3'
+
+jobs:
+  process-videos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350  # 5h 50m (buffer before 6h limit)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg chromium-browser chromium-chromedriver
+          df -h  # Show disk space
+      
+      - name: Install Python dependencies
+        run: |
+          cd jable
+          pip install -r requirements.txt
+      
+      - name: Pull latest changes
+        run: |
+          git config pull.rebase false
+          git pull origin main || true
+      
+      - name: Run pipeline
+        env:
+          # Add your API keys as GitHub Secrets
+          STREAMWISH_API_KEY: ${{ secrets.STREAMWISH_API_KEY }}
+          LULUSTREAM_API_KEY: ${{ secrets.LULUSTREAM_API_KEY }}
+          STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
+          STREAMTAPE_PASSWORD: ${{ secrets.STREAMTAPE_PASSWORD }}
+          MAX_VIDEOS: ${{ github.event.inputs.max_videos || '3' }}
+        run: |
+          cd jable
+          python run_github_actions.py
+        timeout-minutes: 340
+      
+      - name: Show disk usage
+        if: always()
+        run: df -h
+      
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add jable/database/*.json videos_complete.json 2>/dev/null || true
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" && git push) || true
+      
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ github.run_number }}
+          path: |
+            jable/*.log
+          retention-days: 3

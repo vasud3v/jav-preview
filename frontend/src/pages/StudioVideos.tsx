@@ -84,7 +84,7 @@ export default function StudioVideos() {
               No videos found for this studio.
             </div>
           ) : (
-            <VideoGrid videos={videos} columns={6} />
+            <VideoGrid videos={videos} columns={6} virtual={true} />
           )}
 
           {totalPages > 1 && (

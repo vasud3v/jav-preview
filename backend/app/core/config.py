@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     port: int = 8000
     
     # CORS - accepts comma-separated string from env
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
     
     @property
     def cors_origins_list(self) -> list[str]:

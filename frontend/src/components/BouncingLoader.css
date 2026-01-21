@@ -1,0 +1,349 @@
+/* Page Loader - Bouncing Circles (same as PullToRefresh) */
+.page-loader-wrapper {
+  width: 80px;
+  height: 40px;
+  position: relative;
+  z-index: 1;
+  will-change: transform, opacity;
+  margin: 0 auto;
+  display: block;
+}
+
+.page-circle {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  border-radius: 50%;
+  background-color: #ffffff;
+  left: 15%;
+  transform-origin: 50%;
+  animation: pageCircleBounce 0.5s alternate infinite ease;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@keyframes pageCircleBounce {
+  0% {
+    transform: translate3d(0, 40px, 0) scaleX(1.7) scaleY(0.25);
+  }
+  40% {
+    transform: translate3d(0, 20px, 0) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+  }
+}
+
+.page-circle:nth-child(2) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.page-circle:nth-child(3) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+.page-shadow {
+  width: 12px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+  position: absolute;
+  top: 42px;
+  transform-origin: 50%;
+  z-index: -1;
+  left: 15%;
+  filter: blur(1px);
+  animation: pageShadowBounce 0.5s alternate infinite ease;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@keyframes pageShadowBounce {
+  0% {
+    transform: scaleX(1.5);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scaleX(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scaleX(0.2);
+    opacity: 0.4;
+  }
+}
+
+.page-shadow:nth-child(4) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.page-shadow:nth-child(5) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+/* Responsive sizing */
+@media (min-width: 768px) {
+  .page-loader-wrapper {
+    width: 100px;
+    height: 50px;
+  }
+  
+  .page-circle {
+    width: 14px;
+    height: 14px;
+  }
+  
+  @keyframes pageCircleBounce {
+    0% {
+      transform: translate3d(0, 50px, 0) scaleX(1.7) scaleY(0.25);
+    }
+    40% {
+      transform: translate3d(0, 25px, 0) scaleX(1) scaleY(1);
+    }
+    100% {
+      transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+    }
+  }
+  
+  .page-shadow {
+    width: 14px;
+    top: 52px;
+  }
+}
+
+/* Bouncing Circles Loader - GPU Accelerated */
+.loader-wrapper {
+  width: 80px;
+  height: 40px;
+  position: relative;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+
+.circle {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  border-radius: 50%;
+  background-color: #ffffff;
+  left: 15%;
+  transform-origin: 50%;
+  animation: circle7124 0.5s alternate infinite ease;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@keyframes circle7124 {
+  0% {
+    transform: translate3d(0, 40px, 0) scaleX(1.7) scaleY(0.25);
+  }
+  40% {
+    transform: translate3d(0, 20px, 0) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+  }
+}
+
+.circle:nth-child(2) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.circle:nth-child(3) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+.shadow {
+  width: 12px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+  position: absolute;
+  top: 42px;
+  transform-origin: 50%;
+  z-index: -1;
+  left: 15%;
+  filter: blur(1px);
+  animation: shadow046 0.5s alternate infinite ease;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+@keyframes shadow046 {
+  0% {
+    transform: scaleX(1.5);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scaleX(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scaleX(0.2);
+    opacity: 0.4;
+  }
+}
+
+.shadow:nth-child(4) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.shadow:nth-child(5) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+/* Responsive sizing */
+@media (min-width: 768px) {
+  .loader-wrapper {
+    width: 100px;
+    height: 50px;
+  }
+  
+  .circle {
+    width: 14px;
+    height: 14px;
+  }
+  
+  @keyframes circle7124 {
+    0% {
+      transform: translate3d(0, 50px, 0) scaleX(1.7) scaleY(0.25);
+    }
+    40% {
+      transform: translate3d(0, 25px, 0) scaleX(1) scaleY(1);
+    }
+    100% {
+      transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+    }
+  }
+  
+  .shadow {
+    width: 14px;
+    top: 52px;
+  }
+}
+
+/* Legacy bouncing-loader-wrapper support (for backward compatibility) */
+.bouncing-loader-wrapper {
+  width: 80px;
+  height: 40px;
+  position: relative;
+  z-index: 1;
+  will-change: transform, opacity;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  min-height: 60px;
+  padding: 10px 0;
+}
+
+.bouncing-circle {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  border-radius: 50%;
+  background-color: #ffffff;
+  left: 15%;
+  transform-origin: 50%;
+  animation: bounceCircle 0.5s alternate infinite ease;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+@keyframes bounceCircle {
+  0% {
+    transform: translate3d(0, 40px, 0) scaleX(1.7) scaleY(0.25);
+  }
+  40% {
+    transform: translate3d(0, 20px, 0) scaleX(1) scaleY(1);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scaleX(1) scaleY(1);
+  }
+}
+
+.bouncing-circle:nth-child(2) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.bouncing-circle:nth-child(3) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+.bouncing-shadow {
+  width: 12px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.3);
+  position: absolute;
+  top: 42px;
+  transform-origin: 50%;
+  z-index: -1;
+  left: 15%;
+  filter: blur(1px);
+  animation: bounceShadow 0.5s alternate infinite ease;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style paint;
+}
+
+@keyframes bounceShadow {
+  0% {
+    transform: scaleX(1.5);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scaleX(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scaleX(0.2);
+    opacity: 0.4;
+  }
+}
+
+.bouncing-shadow:nth-child(4) {
+  left: 45%;
+  animation-delay: 0.2s;
+}
+
+.bouncing-shadow:nth-child(5) {
+  left: auto;
+  right: 15%;
+  animation-delay: 0.3s;
+}
+
+/* Ensure enough space for animation */
+.bouncing-loader-wrapper::before {
+  content: '';
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

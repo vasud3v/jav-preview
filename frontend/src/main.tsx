@@ -4,28 +4,47 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
 
-// Graceful shutdown handling
-window.addEventListener('beforeunload', () => {
-  // Cleanup any pending requests, close connections, etc.
-  console.log('Application shutting down gracefully...')
-  
-  // You can add cleanup logic here if needed
-  // For example: close WebSocket connections, cancel pending requests, etc.
-})
+// Performance monitoring
+if (import.meta.env.DEV) {
+  // Only in development
+  console.log('🚀 App starting in development mode');
+}
 
-// Handle page visibility changes (tab switching, minimizing)
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    console.log('Application paused (tab hidden)')
-  } else {
-    console.log('Application resumed (tab visible)')
-  }
-})
+// Preload critical resources
+const preloadCriticalResources = () => {
+  // Preload fonts if any
+  // const fontLink = document.createElement('link');
+  // fontLink.rel = 'preload';
+  // fontLink.as = 'font';
+  // fontLink.href = '/fonts/your-font.woff2';
+  // document.head.appendChild(fontLink);
+};
 
-createRoot(document.getElementById('root')!).render(
+preloadCriticalResources();
+
+// Optimize rendering
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('Root element not found');
+
+// Use concurrent features for better performance
+const root = createRoot(rootElement);
+
+root.render(
   <StrictMode>
     <AuthProvider>
       <App />
     </AuthProvider>
   </StrictMode>,
-)
+);
+
+// Report Web Vitals (optional - for monitoring)
+if (import.meta.env.PROD) {
+  // You can add web vitals reporting here
+  // import('web-vitals').then(({ getCLS, getFID, getFCP, getLCP, getTTFB }) => {
+  //   getCLS(console.log);
+  //   getFID(console.log);
+  //   getFCP(console.log);
+  //   getLCP(console.log);
+  //   getTTFB(console.log);
+  // });
+}

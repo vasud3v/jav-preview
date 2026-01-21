@@ -170,7 +170,7 @@ stats_cache = LRUCache[dict](
 videos_list_cache = LRUCache[dict](
     name="videos_list",
     max_items=100,
-    ttl_seconds=120,  # 2 minutes
+    ttl_seconds=300,  # 5 minutes (increased from 2 for better performance)
 )
 
 video_detail_cache = LRUCache[dict](
