@@ -1763,15 +1763,14 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 4. Get details of interacted videos to find patterns
         interacted_videos = []
-        for code in list(interacted_codes)[:20]:  # Limit to avoid too many queries
-            video = await client.get(
+        codes_list = list(interacted_codes)[:20]
+        if codes_list:
+            codes_filter = ','.join(f'"{code}"' for code in codes_list)
+            interacted_videos = await client.get(
                 'videos',
                 select='code,studio,series',
-                filters={'code': f'eq.{code}'},
-                limit=1
+                filters={'code': f'in.({codes_filter})'}
             )
-            if video:
-                interacted_videos.extend(video)
         
         # Extract preferences
         preferred_studios = {}
@@ -1869,19 +1868,24 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
                     limit=20
                 )
                 if cat_videos:
+                    codes_to_fetch = []
                     for cv in cat_videos[:15]:
                         code = cv['video_code']
                         if code not in seen_codes:
-                            video = await client.get(
-                                'videos',
-                                select='code,title,thumbnail_url,duration,release_date,studio,views',
-                                filters={'code': f'eq.{code}'},
-                                limit=1
-                            )
-                            if video:
-                                video[0]['_score'] = WEIGHT_CATEGORY
-                                candidates.append(video[0])
-                                seen_codes.add(code)
+                            codes_to_fetch.append(code)
+                            seen_codes.add(code)
+
+                    if codes_to_fetch:
+                        codes_filter = ','.join(f'"{code}"' for code in codes_to_fetch)
+                        videos = await client.get(
+                            'videos',
+                            select='code,title,thumbnail_url,duration,release_date,studio,views',
+                            filters={'code': f'in.({codes_filter})'}
+                        )
+                        if videos:
+                            for video in videos:
+                                video['_score'] = WEIGHT_CATEGORY
+                                candidates.append(video)
         
         # Strategy 4: Same cast
         for cast_name, _ in top_cast:
@@ -1901,19 +1905,24 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
                     limit=15
                 )
                 if cast_videos:
+                    codes_to_fetch = []
                     for cv in cast_videos[:10]:
                         code = cv['video_code']
                         if code not in seen_codes:
-                            video = await client.get(
-                                'videos',
-                                select='code,title,thumbnail_url,duration,release_date,studio,views',
-                                filters={'code': f'eq.{code}'},
-                                limit=1
-                            )
-                            if video:
-                                video[0]['_score'] = WEIGHT_CAST
-                                candidates.append(video[0])
-                                seen_codes.add(code)
+                            codes_to_fetch.append(code)
+                            seen_codes.add(code)
+
+                    if codes_to_fetch:
+                        codes_filter = ','.join(f'"{code}"' for code in codes_to_fetch)
+                        videos = await client.get(
+                            'videos',
+                            select='code,title,thumbnail_url,duration,release_date,studio,views',
+                            filters={'code': f'in.({codes_filter})'}
+                        )
+                        if videos:
+                            for video in videos:
+                                video['_score'] = WEIGHT_CAST
+                                candidates.append(video)
         
         # 8. Score and rank candidates
         import math
