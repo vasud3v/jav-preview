@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Grid3X3, Search } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -28,9 +28,6 @@ export default function Categories() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
 
   if (loading && !categories) {
     return (
@@ -59,7 +56,7 @@ export default function Categories() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search categories..."
             className="bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-4 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 w-48"
             style={{ '--tw-ring-color': `rgba(${color.rgb}, 0.5)` } as React.CSSProperties}

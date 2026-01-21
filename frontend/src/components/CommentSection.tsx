@@ -31,20 +31,32 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
 
   // Reload comments when auth state changes (userId will be different)
   useEffect(() => {
+    const loadComments = async () => {
+      setLoading(true);
+      setComments([]); // Clear stale comments immediately
+      try {
+        const data = await api.getComments(videoCode, userId, sort);
+        setComments(data.comments);
+        setCount(data.count);
+      } catch (err) {
+        console.error('Failed to load comments:', err);
+        setComments([]);
+        setCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
     loadComments();
-  }, [videoCode, sort, user?.id]);
+  }, [videoCode, sort, userId]);
 
   const loadComments = async () => {
     setLoading(true);
-    setComments([]); // Clear stale comments immediately
     try {
       const data = await api.getComments(videoCode, userId, sort);
       setComments(data.comments);
       setCount(data.count);
     } catch (err) {
       console.error('Failed to load comments:', err);
-      setComments([]);
-      setCount(0);
     } finally {
       setLoading(false);
     }
@@ -75,54 +87,6 @@ export default function CommentSection({ videoCode }: CommentSectionProps) {
     }
   };
 
-  // Helper to recursively add reply to correct parent
-  const addReplyToTree = (comments: Comment[], parentId: number, newReply: Comment): Comment[] => {
-    return comments.map(c => {
-      if (c.id === parentId) {
-        return { ...c, replies: [...c.replies, newReply] };
-      }
-      if (c.replies.length > 0) {
-        return { ...c, replies: addReplyToTree(c.replies, parentId, newReply) };
-      }
-      return c;
-    });
-  };
-
-  // Helper to update comment in tree
-  const updateCommentInTree = (comments: Comment[], commentId: number, updates: Partial<Comment>): Comment[] => {
-    return comments.map(c => {
-      if (c.id === commentId) {
-        return { ...c, ...updates };
-      }
-      if (c.replies.length > 0) {
-        return { ...c, replies: updateCommentInTree(c.replies, commentId, updates) };
-      }
-      return c;
-    });
-  };
-
-  // Helper to remove comment from tree
-  const removeCommentFromTree = (comments: Comment[], commentId: number): Comment[] => {
-    return comments
-      .filter(c => c.id !== commentId)
-      .map(c => ({
-        ...c,
-        replies: c.replies.length > 0 ? removeCommentFromTree(c.replies, commentId) : c.replies
-      }));
-  };
-
-  // Helper to mark comment as deleted (soft delete for threads)
-  const markDeletedInTree = (comments: Comment[], commentId: number): Comment[] => {
-    return comments.map(c => {
-      if (c.id === commentId) {
-        return { ...c, is_deleted: true, content: '[deleted]' };
-      }
-      if (c.replies.length > 0) {
-        return { ...c, replies: markDeletedInTree(c.replies, commentId) };
-      }
-      return c;
-    });
-  };
 
   return (
     <div className="mt-8 pt-6 border-t border-white/5">

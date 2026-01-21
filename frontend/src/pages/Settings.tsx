@@ -60,25 +60,24 @@ export default function Settings() {
 
   // Load watch history when tab changes
   useEffect(() => {
+    const loadWatchHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const userId = getAnonymousUserId();
+        const data = await api.getWatchHistory(userId, historyPage, 12);
+        setWatchHistory(data.items);
+        setHistoryTotal(data.total);
+        setHistoryTotalPages(data.total_pages);
+      } catch (err) {
+        console.error('Failed to load watch history:', err);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
     if (tab === 'history') {
       loadWatchHistory();
     }
   }, [tab, historyPage]);
-
-  const loadWatchHistory = async () => {
-    setHistoryLoading(true);
-    try {
-      const userId = getAnonymousUserId();
-      const data = await api.getWatchHistory(userId, historyPage, 12);
-      setWatchHistory(data.items);
-      setHistoryTotal(data.total);
-      setHistoryTotalPages(data.total_pages);
-    } catch (err) {
-      console.error('Failed to load watch history:', err);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
 
   const handleClearHistory = async () => {
     if (!confirm('Are you sure you want to clear your watch history? This cannot be undone.')) return;
@@ -90,7 +89,7 @@ export default function Settings() {
       setWatchHistory([]);
       setHistoryTotal(0);
       setSuccess('Watch history cleared');
-    } catch (err) {
+    } catch {
       setError('Failed to clear watch history');
     } finally {
       setClearingHistory(false);

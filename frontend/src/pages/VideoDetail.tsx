@@ -86,7 +86,7 @@ export default function VideoDetail() {
   // Fetch bookmark status when user changes or code changes
   useEffect(() => {
     if (!code) return;
-    const bookmarkUserId = getBookmarkUserId();
+    const bookmarkUserId = user?.id ? `user_${user.id}` : null;
     if (bookmarkUserId) {
       api.isBookmarked(code, bookmarkUserId).then(r => setBookmarked(r.bookmarked)).catch(() => { });
     } else {
@@ -111,7 +111,7 @@ export default function VideoDetail() {
         slideshowRef.current = null;
       }
     };
-  }, [slideshow, galleryOpen, video?.gallery_images?.length, video?.cover_url, video?.thumbnail_url]);
+  }, [slideshow, galleryOpen, video]);
 
   // Auto-scroll to center current thumbnail
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function VideoDetail() {
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryOpen, showGrid, video?.gallery_images?.length]);
+  }, [galleryOpen, showGrid, video]);
 
   const copy = () => { navigator.clipboard.writeText(`JAV ${video?.code || ''}`); setCopied(true); setTimeout(() => setCopied(false), 1200); };
 

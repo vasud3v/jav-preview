@@ -210,7 +210,7 @@ const Navbar = () => {
                     {user.avatar_url ? (
                       <img
                         key={user.avatar_url}
-                        src={`${user.avatar_url}?t=${Date.now()}`}
+                        src={user.avatar_url}
                         alt=""
                         className="w-8 h-8 rounded-full object-cover"
                         style={styles.ring}
