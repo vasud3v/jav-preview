@@ -1880,15 +1880,19 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 4. Get details of interacted videos to find patterns
         interacted_videos = []
-        for code in list(interacted_codes)[:20]:  # Limit to avoid too many queries
-            video = await client.get(
+        interacted_codes_list = list(interacted_codes)[:20]  # Limit to avoid too many queries
+
+        if interacted_codes_list:
+            codes_filter = ','.join(interacted_codes_list)
+            interacted_videos = await client.get(
                 'videos',
                 select='code,studio,series',
-                filters={'code': f'eq.{code}'},
-                limit=1
+                filters={'code': f'in.({codes_filter})'}
             )
-            if video:
-                interacted_videos.extend(video)
+
+            # Ensure it's a list (should be already, but just in case)
+            if not interacted_videos:
+                interacted_videos = []
         
         # Extract preferences
         preferred_studios = {}
