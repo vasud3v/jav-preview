@@ -67,6 +67,7 @@ export default function VideoSection({
         <div className="flex items-center gap-2">
           <button
             onClick={() => scroll('left')}
+            aria-label="Scroll left"
             className={`p-2 rounded-full bg-muted/50 backdrop-blur-sm border border-border 
               hover:scale-110 active:scale-95 text-muted-foreground 
               transition-all duration-200 ease-out cursor-pointer
@@ -94,6 +95,7 @@ export default function VideoSection({
           </button>
           <button
             onClick={() => scroll('right')}
+            aria-label="Scroll right"
             className={`p-2 rounded-full bg-muted/50 backdrop-blur-sm border border-border 
               hover:scale-110 active:scale-95 text-muted-foreground 
               transition-all duration-200 ease-out cursor-pointer

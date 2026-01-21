@@ -79,7 +79,18 @@ const VideoCard = memo(function VideoCard({ video, onClick, highlightColor }: Vi
   const handleImageError = useCallback(() => setImageError(true), []);
 
   return (
-    <div className="group cursor-pointer" onClick={handleClick}>
+    <div
+      className="group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+      onClick={handleClick}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+    >
       {/* Thumbnail */}
       <div className="relative rounded-lg overflow-hidden mb-2 bg-muted aspect-[2/3]">
         {thumbnailUrl ? (
