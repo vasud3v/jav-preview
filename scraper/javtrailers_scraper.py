@@ -7,15 +7,28 @@ Uses SeleniumBase to bypass Cloudflare protection
 import json
 import re
 import time
+import requests
+import logging
+import os
+import sys
+import glob
+import traceback
 from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 from seleniumbase import Driver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from utils import format_code
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 @dataclass
 class VideoMetadata:
@@ -51,43 +64,54 @@ class JavTrailersScraper:
         
     def _init_driver(self):
         """Initialize SeleniumBase Driver with UC mode"""
-        if self.driver is None:
-            print("Initializing browser and passing Cloudflare check...")
+        if self.driver is not None:
+            return
+
+        logger.info("Initializing browser and passing Cloudflare check...")
+
+        # Disable snap connections on Linux
+        if sys.platform.startswith('linux'):
+            # Disable snap
+            os.environ['SNAP_NAME'] = ''
+            os.environ['SNAP'] = ''
+            os.environ['SNAP_INSTANCE_NAME'] = ''
             
-            # Disable snap connections on Linux
-            import sys
-            import os
-            if sys.platform.startswith('linux'):
-                # Disable snap
-                os.environ['SNAP_NAME'] = ''
-                os.environ['SNAP'] = ''
-                os.environ['SNAP_INSTANCE_NAME'] = ''
-                
-                # Try to find Google Chrome (not snap)
-                chrome_paths = [
-                    '/usr/bin/google-chrome',
-                    '/usr/bin/google-chrome-stable',
-                    '/usr/bin/chromium-browser',
-                    '/usr/bin/chromium'
-                ]
-                
-                for chrome_path in chrome_paths:
-                    if os.path.exists(chrome_path):
-                        print(f"Using Chrome binary: {chrome_path}")
-                        break
+            # Try to find Google Chrome (not snap)
+            chrome_paths = [
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium'
+            ]
             
+            for chrome_path in chrome_paths:
+                if os.path.exists(chrome_path):
+                    logger.info(f"Using Chrome binary: {chrome_path}")
+                    break
+
+        try:
             self.driver = Driver(
                 uc=True, 
                 headless=self.headless
             )
             self.driver.get(self.BASE_URL)
-            time.sleep(8)
-    
+            # Wait for title to ensure page loaded, instead of blind sleep
+            # But initial cloudflare check might take time, so we wait a bit
+            # SeleniumBase UC mode usually handles the check automatically
+            time.sleep(5)
+        except Exception as e:
+            logger.error(f"Failed to initialize driver: {e}")
+            if self.driver:
+                self.driver.quit()
+            self.driver = None
+            raise
+
     def _ensure_driver(self, force_restart: bool = False):
         """Ensure driver is alive, recreate if needed"""
-        if self.driver is None or force_restart:
-            if self.driver:
-                self._close_driver()
+        if force_restart and self.driver:
+            self._close_driver()
+
+        if self.driver is None:
             self._init_driver()
             return
             
@@ -95,7 +119,7 @@ class JavTrailersScraper:
             # Simple check if driver is responsive
             _ = self.driver.current_url
         except Exception as e:
-            print(f"  Browser connection lost ({type(e).__name__}), restarting...")
+            logger.warning(f"Browser connection lost ({type(e).__name__}), restarting...")
             self._close_driver()
             self._init_driver()
             
@@ -104,9 +128,10 @@ class JavTrailersScraper:
         if self.driver:
             try:
                 self.driver.quit()
-            except:
-                pass
-            self.driver = None
+            except Exception as e:
+                logger.warning(f"Error closing driver: {e}")
+            finally:
+                self.driver = None
 
     def _is_placeholder_image(self, url: str) -> bool:
         """
@@ -114,8 +139,6 @@ class JavTrailersScraper:
         DMM returns small placeholder images (~3-5KB) for unavailable content.
         Real thumbnails are typically 10KB+.
         """
-        import requests
-        
         try:
             # Use HEAD request first to get content length without downloading
             response = requests.head(url, timeout=5, allow_redirects=True)
@@ -147,12 +170,15 @@ class JavTrailersScraper:
         for attempt in range(max_retries):
             try:
                 self.driver.get(url)
-                time.sleep(5)
+                # Wait for at least one video link to be present
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "a[href^='/video/']"))
+                )
                 break
             except Exception as e:
-                print(f"  Error loading list page (attempt {attempt+1}/{max_retries}): {e}")
+                logger.error(f"Error loading list page (attempt {attempt+1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    print("  Restarting driver and retrying...")
+                    logger.info("Restarting driver and retrying...")
                     self._ensure_driver(force_restart=True)
                 else:
                     return []
@@ -181,16 +207,19 @@ class JavTrailersScraper:
             try:
                 self._ensure_driver()
                 self.driver.get(url)
-                time.sleep(4)
+                # Wait for title to indicate page load
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "h1"))
+                )
                 page_source = self.driver.page_source
                 break
             except Exception as e:
-                print(f"  Error loading video page (attempt {attempt+1}/{max_retries}): {e}")
+                logger.error(f"Error loading video page (attempt {attempt+1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    print("  Restarting driver and retrying...")
+                    logger.info("Restarting driver and retrying...")
                     self._ensure_driver(force_restart=True)
                 else:
-                    print(f"Failed to load {url} after {max_retries} attempts")
+                    logger.error(f"Failed to load {url} after {max_retries} attempts")
                     return None
         
         try:
@@ -207,28 +236,23 @@ class JavTrailersScraper:
             
             nuxt_data = self._extract_nuxt_data(page_source)
             
-            # Extract title - prefer H1 element as it's specific to the current page
-            # NUXT data contains multiple videos (related/recommended) so it's unreliable for title
+            # Extract title
             title = ""
             h1_elem = soup.find('h1')
             if h1_elem:
-                # Get text content, excluding any nested SVG or script elements
                 for svg in h1_elem.find_all('svg'):
                     svg.decompose()
                 for script in h1_elem.find_all('script'):
                     script.decompose()
                 h1_text = h1_elem.get_text(strip=True)
-                # H1 usually contains the full title with code prefix
                 if h1_text and len(h1_text) > 3 and h1_text.lower() != 'page not found':
                     title = h1_text
             
-            # Fallback to code only - don't use NUXT data for title as it contains related videos
             if not title:
                 title = code
             
-            # Validate title - reject if it contains HTML/SVG markup
             if '<' in title or '>' in title or 'clip-path' in title or 'fill=' in title:
-                print(f"  Warning: Invalid title detected, using code only")
+                logger.warning(f"Invalid title detected for {code}, using code only")
                 title = code
                 
             # Extract duration
@@ -246,23 +270,19 @@ class JavTrailersScraper:
                     remaining_mins = total_mins % 60
                     duration = f"{hours}:{remaining_mins:02d}:00" if hours else f"{remaining_mins}:00"
                 
-            # Extract release date - prefer HTML extraction as it's more reliable
+            # Extract release date
             release_date = ""
-            # First try to extract from visible HTML (most reliable) - handle span tags
             date_match = re.search(r'Release Date:(?:</span>)?\s*(\d{1,2}\s+\w+\s+\d{4})', page_source)
             if date_match:
                 release_date = date_match.group(1)
-            # Fallback to NUXT data if HTML extraction failed
             if not release_date and nuxt_data and 'releaseDate' in nuxt_data:
                 release_date = nuxt_data['releaseDate']
                 
-            # Extract thumbnail (small) and cover (large) URLs
-            # ps.jpg = small poster, pl.jpg = large poster
+            # Extract thumbnail and cover
             thumbnail_url = ""
             cover_url = ""
             if nuxt_data and 'image' in nuxt_data:
                 img_url = nuxt_data['image']
-                # Determine which one we got and derive the other
                 if 'pl.jpg' in img_url:
                     cover_url = img_url
                     thumbnail_url = img_url.replace('pl.jpg', 'ps.jpg')
@@ -289,13 +309,13 @@ class JavTrailersScraper:
             # Click play button to load video player and get trailer URLs
             embed_urls = self._extract_trailer_by_click(url_code, page_source, soup)
             
-            # Extract gallery images - click gallery button for high quality
+            # Extract gallery images
             gallery_images = self._extract_gallery_by_click(url_code)
             if not gallery_images and nuxt_data and 'gallery' in nuxt_data:
                 gallery_images = nuxt_data['gallery']
-                print(f"  Found {len(gallery_images)} gallery images from NUXT data")
+                logger.info(f"Found {len(gallery_images)} gallery images from NUXT data")
             
-            # Extract categories - only from video info section, not navbar
+            # Extract categories
             categories = []
             if nuxt_data and 'categories' in nuxt_data:
                 cat_data = nuxt_data['categories']
@@ -306,7 +326,6 @@ class JavTrailersScraper:
                         elif isinstance(cat, str):
                             categories.append(cat)
             else:
-                # Look for categories in the video description area only
                 cat_section = soup.find('span', string=re.compile(r'Categories?:', re.IGNORECASE))
                 if cat_section:
                     parent = cat_section.find_parent('p')
@@ -320,12 +339,11 @@ class JavTrailersScraper:
             cast = []
             cast_images = {}
             nuxt_cast_avatars = {}
-            nuxt_cast_data = {}  # Store full cast data from NUXT
+            nuxt_cast_data = {}
             try:
                 match = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', page_source, re.DOTALL)
                 if match:
                     nuxt_json = json.loads(match.group(1))
-                    # First pass: collect all actjpgs URLs
                     for item in nuxt_json:
                         if isinstance(item, str) and 'actjpgs' in item and '.jpg' in item:
                             filename_match = re.search(r'actjpgs/([^.]+)\.jpg', item)
@@ -337,14 +355,11 @@ class JavTrailersScraper:
                                     reversed_name = f"{parts[1]}_{parts[0]}"
                                     nuxt_cast_avatars[reversed_name] = item
                     
-                    # Second pass: collect cast objects with avatar info
                     for item in nuxt_json:
                         if isinstance(item, dict) and 'name' in item and 'slug' in item:
-                            # Check if this is a cast member (has jpName or avatar)
                             if 'jpName' in item or 'avatar' in item:
                                 name = item.get('name', '')
                                 slug = item.get('slug', '')
-                                # Ensure slug is a string before replacing
                                 if isinstance(slug, str):
                                     slug = slug.replace('-', '_')
                                 else:
@@ -355,35 +370,28 @@ class JavTrailersScraper:
                                         'slug': slug,
                                         'avatar': avatar if isinstance(avatar, str) else ''
                                     }
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Error extracting NUXT cast data: {e}")
             
             def find_cast_image(cast_text, href, nuxt_cast_data, nuxt_cast_avatars):
-                """Find cast image URL using multiple matching strategies."""
-                # Strategy 1: Check nuxt_cast_data by exact name
                 if cast_text in nuxt_cast_data and nuxt_cast_data[cast_text].get('avatar'):
                     return nuxt_cast_data[cast_text]['avatar']
                 
-                # Strategy 2: Match by href slug
                 slug_match = re.search(r'/casts/([^/]+)', href)
                 if slug_match:
                     slug = slug_match.group(1).replace('-', '_')
                     if slug in nuxt_cast_avatars:
                         return nuxt_cast_avatars[slug]
                 
-                # Strategy 3: Match by name parts (handles typos in href)
-                # Extract English name parts
                 english_match = re.match(r'^([A-Za-z\s]+)', cast_text)
                 if english_match:
                     name_parts = english_match.group(1).strip().lower().split()
                     if len(name_parts) >= 2:
                         first = name_parts[0]
                         last = name_parts[-1]
-                        # Try different combinations
                         for slug_try in [f"{last}_{first}", f"{first}_{last}"]:
                             if slug_try in nuxt_cast_avatars:
                                 return nuxt_cast_avatars[slug_try]
-                
                 return None
             
             cast_section = soup.find('span', string=re.compile(r'Cast\(s\):'))
@@ -411,18 +419,15 @@ class JavTrailersScraper:
                             if img_url:
                                 cast_images[cast_text] = img_url
                         
-            # Extract studio - look in video info section, not navbar
+            # Extract studio
             studio = ""
-            # First try NUXT data
             if nuxt_data and 'studio' in nuxt_data:
                 studio_info = nuxt_data['studio']
                 if isinstance(studio_info, dict) and 'name' in studio_info:
                     studio = studio_info['name']
                 elif isinstance(studio_info, str) and not studio_info.isdigit():
                     studio = studio_info
-                # If studio_info is an int or numeric string, ignore it and use fallback
             
-            # Fallback: look for studio in the video description area
             if not studio:
                 studio_section = soup.find('span', string=re.compile(r'Studio:', re.IGNORECASE))
                 if studio_section:
@@ -432,7 +437,6 @@ class JavTrailersScraper:
                         if studio_link:
                             studio = studio_link.get_text(strip=True)
             
-            # Second fallback: look in description div
             if not studio:
                 desc_div = soup.find('div', id='description')
                 if desc_div:
@@ -440,10 +444,8 @@ class JavTrailersScraper:
                     if studio_link:
                         studio = studio_link.get_text(strip=True)
             
-            # Third fallback: find studio link in main content area (not nav)
             if not studio:
                 main_content = soup.find('main') or soup.find('div', class_='container') or soup
-                # Exclude navigation areas - create a copy to avoid modifying while iterating
                 nav_elements = main_content.find_all(['nav', 'header', 'footer'])
                 for nav in nav_elements:
                     if hasattr(nav, 'decompose'):
@@ -467,15 +469,13 @@ class JavTrailersScraper:
             if desc_elem:
                 description = desc_elem.get('content', '')
             
-            # Validate that we have real content - skip placeholder/incomplete videos
-            # Check if thumbnail exists and is not a placeholder
+            # Validate
             if not thumbnail_url or not cover_url:
-                print(f"  Skipping {code}: No thumbnail/cover image found")
+                logger.info(f"Skipping {code}: No thumbnail/cover image found")
                 return None
             
-            # Check if the image is a "now printing" placeholder by making a HEAD request
             if self._is_placeholder_image(thumbnail_url):
-                print(f"  Skipping {code}: Thumbnail is a placeholder image")
+                logger.info(f"Skipping {code}: Thumbnail is a placeholder image")
                 return None
                 
             return VideoMetadata(
@@ -499,8 +499,7 @@ class JavTrailersScraper:
             )
             
         except Exception as e:
-            print(f"Error scraping {url}: {e}")
-            import traceback
+            logger.error(f"Error scraping {url}: {e}")
             traceback.print_exc()
             return None
 
@@ -545,9 +544,9 @@ class JavTrailersScraper:
                         embed_urls.append(match)
                 
                 if embed_urls:
-                    print(f"  Found {len(embed_urls)} trailer URLs from player")
+                    logger.info(f"Found {len(embed_urls)} trailer URLs from player")
         except Exception as e:
-            print(f"  Could not extract trailer by click: {e}")
+            logger.warning(f"Could not extract trailer by click: {e}")
         
         # Fallback to page source extraction if no URLs found
         if not embed_urls:
@@ -619,7 +618,7 @@ class JavTrailersScraper:
             return result if len(result) > 1 else None
             
         except Exception as e:
-            print(f"  Could not parse NUXT data: {e}")
+            logger.warning(f"Could not parse NUXT data: {e}")
             return None
 
     def _extract_gallery_by_click(self, url_code: str) -> list:
@@ -748,7 +747,7 @@ class JavTrailersScraper:
                     stream_base = match.group(1)
                     trailer_url = f"{stream_base}/{trailer_id}/playlist.m3u8"
                     embed_urls.append(trailer_url)
-                    print(f"  Found trailer URL")
+                    logger.info(f"Found trailer URL")
                     break
                     
         video_patterns = [
@@ -770,8 +769,6 @@ class JavTrailersScraper:
     
     def _cleanup_debug_files(self):
         """Remove all debug HTML files"""
-        import glob
-        import os
         for f in glob.glob('debug_*.html'):
             try:
                 os.remove(f)

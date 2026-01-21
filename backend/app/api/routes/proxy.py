@@ -2,8 +2,9 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 import httpx
-from urllib.parse import unquote, quote
+from urllib.parse import unquote, quote, urlparse
 import hashlib
+import ipaddress
 
 from app.core.cache import playlist_cache, segment_cache, image_cache
 
@@ -20,7 +21,8 @@ def get_client() -> httpx.AsyncClient:
         _client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=True,
-            verify=False,
+            # Enable SSL verification for security
+            verify=True,
             limits=httpx.Limits(
                 max_keepalive_connections=50,
                 max_connections=200,
@@ -48,10 +50,54 @@ def cache_key(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
+def validate_url(url: str) -> str:
+    """
+    Validate URL to prevent SSRF and other attacks.
+    Returns the valid URL or raises HTTPException.
+    """
+    if not url:
+        raise HTTPException(status_code=400, detail="Missing URL")
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid URL format")
+
+    if parsed.scheme not in ('http', 'https'):
+        raise HTTPException(status_code=400, detail="Invalid URL scheme")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise HTTPException(status_code=400, detail="Invalid URL hostname")
+
+    # Block localhost and private IPs
+    # This is a basic check. For full SSRF protection, DNS resolution should be checked.
+    # However, blocking common private ranges helps.
+
+    # 1. Check for localhost strings
+    if hostname.lower() in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
+        raise HTTPException(status_code=403, detail="Access to localhost denied")
+
+    # 2. Check for private IP addresses if hostname is an IP
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            raise HTTPException(status_code=403, detail="Access to private IP denied")
+    except ValueError:
+        # Not an IP address, it's a domain name.
+        # Ideally we should resolve it and check the IP, but that adds latency.
+        # For now we rely on the fact that we trust the upstream DNS or that
+        # attackers can't easily make public DNS point to internal IPs in this context.
+        pass
+
+    return url
+
+
 @router.get("/m3u8")
 async def proxy_m3u8(url: str, request: Request):
     """Proxy HLS m3u8 playlist with caching."""
     decoded_url = unquote(url)
+    validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -128,6 +174,7 @@ async def proxy_m3u8(url: str, request: Request):
 async def proxy_ts(url: str, request: Request):
     """Proxy video segments with aggressive caching."""
     decoded_url = unquote(url)
+    validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -186,6 +233,7 @@ async def proxy_ts(url: str, request: Request):
 async def proxy_image(url: str):
     """Proxy images with caching."""
     decoded_url = unquote(url)
+    validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
