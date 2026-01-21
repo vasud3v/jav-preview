@@ -216,7 +216,7 @@ Examples:
         '--mode', 
         type=str, 
         default='random',
-        choices=['full', 'incremental', 'retry-failed', 'date-range', 'codes', 'random'],
+        choices=['full', 'incremental', 'retry-failed', 'date-range', 'codes', 'random', 'cast'],
         help='Extraction mode (default: random)'
     )
     
