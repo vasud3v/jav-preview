@@ -215,6 +215,52 @@ async def _get_video_cast(client, video_code: str) -> List[str]:
     return []
 
 
+async def _get_categories_for_videos(client, video_codes: List[str]) -> Dict[str, List[str]]:
+    """Get categories for multiple videos efficiently."""
+    if not video_codes:
+        return {}
+
+    codes_filter = ','.join(f'"{code}"' for code in video_codes)
+    data = await client.get(
+        'video_categories',
+        select='video_code,categories(name)',
+        filters={'video_code': f'in.({codes_filter})'}
+    )
+
+    result = {}
+    if data:
+        for r in data:
+            if r.get('categories'):
+                video_code = r['video_code']
+                if video_code not in result:
+                    result[video_code] = []
+                result[video_code].append(r['categories']['name'])
+    return result
+
+
+async def _get_cast_for_videos(client, video_codes: List[str]) -> Dict[str, List[str]]:
+    """Get cast for multiple videos efficiently."""
+    if not video_codes:
+        return {}
+
+    codes_filter = ','.join(f'"{code}"' for code in video_codes)
+    data = await client.get(
+        'video_cast',
+        select='video_code,cast_members(name)',
+        filters={'video_code': f'in.({codes_filter})'}
+    )
+
+    result = {}
+    if data:
+        for r in data:
+            if r.get('cast_members'):
+                video_code = r['video_code']
+                if video_code not in result:
+                    result[video_code] = []
+                result[video_code].append(r['cast_members']['name'])
+    return result
+
+
 async def _paginate(items: List[dict], total: int, page: int, page_size: int) -> PaginatedResponse:
     """Create paginated response."""
     total_pages = math.ceil(total / page_size) if total > 0 else 1
@@ -1746,33 +1792,26 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
         
         # 5. Get categories from watched videos
         preferred_categories = {}
-        for code in list(interacted_codes)[:15]:
-            categories = await client.get(
-                'video_categories',
-                select='category_id,categories(name)',
-                filters={'video_code': f'eq.{code}'}
-            )
-            if categories:
-                for cat in categories:
-                    if cat.get('categories'):
-                        cat_name = cat['categories']['name']
-                        preferred_categories[cat_name] = preferred_categories.get(cat_name, 0) + 1
+        interacted_codes_list = list(interacted_codes)[:15]
+
+        # Batch fetch categories
+        all_categories = await _get_categories_for_videos(client, interacted_codes_list)
+        for code in interacted_codes_list:
+            categories = all_categories.get(code, [])
+            for cat_name in categories:
+                preferred_categories[cat_name] = preferred_categories.get(cat_name, 0) + 1
         
         top_categories = sorted(preferred_categories.items(), key=lambda x: x[1], reverse=True)[:3]
         
         # 6. Get cast from watched videos
         preferred_cast = {}
-        for code in list(interacted_codes)[:15]:
-            cast_members = await client.get(
-                'video_cast',
-                select='cast_id,cast_members(name)',
-                filters={'video_code': f'eq.{code}'}
-            )
-            if cast_members:
-                for member in cast_members:
-                    if member.get('cast_members'):
-                        cast_name = member['cast_members']['name']
-                        preferred_cast[cast_name] = preferred_cast.get(cast_name, 0) + 1
+
+        # Batch fetch cast
+        all_cast = await _get_cast_for_videos(client, interacted_codes_list)
+        for code in interacted_codes_list:
+            cast_members = all_cast.get(code, [])
+            for cast_name in cast_members:
+                preferred_cast[cast_name] = preferred_cast.get(cast_name, 0) + 1
         
         top_cast = sorted(preferred_cast.items(), key=lambda x: x[1], reverse=True)[:3]
         
