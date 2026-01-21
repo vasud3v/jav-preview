@@ -1622,19 +1622,140 @@ async def get_search_suggestions(query: str, limit: int = 10) -> dict:
     return {"suggestions": suggestions[:limit]}
 
 
+async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
+    """Get video codes and details for search results to build facets."""
+    client = get_supabase_rest()
+
+    # Sanitize query to prevent filter syntax errors
+    # Remove characters that might break PostgREST syntax if not properly escaped
+    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    search_term = f'*{safe_query.strip()}*'
+
+    # Fetch videos matching query (larger limit for facets)
+    videos = await client.get(
+        'videos',
+        select='code,studio,release_date',
+        filters={'or': f'(code.ilike.{search_term},title.ilike.{search_term},description.ilike.{search_term})'},
+        order='views.desc',
+        limit=limit
+    )
+    return videos or []
+
+
 async def get_search_facets(query: str = None) -> dict:
     """Get available filter facets for search refinement."""
-    # Simplified facets - just return top categories, studios, cast
     client = get_supabase_rest()
     
-    categories = await get_all_categories()
-    studios = await get_all_studios()
+    if not query:
+        # Default behavior: global top lists
+        categories = await get_all_categories()
+        studios = await get_all_studios()
+        cast = await get_all_cast()
+        return {
+            "categories": categories[:20],
+            "studios": studios[:20],
+            "cast": cast[:20],
+            "years": []
+        }
+
+    # 1. Get matching videos (limit to 500 to be responsive)
+    videos = await _get_search_results_codes(query, limit=500)
+
+    if not videos:
+        return {
+            "categories": [],
+            "studios": [],
+            "cast": [],
+            "years": []
+        }
+
+    video_codes = [v['code'] for v in videos]
+
+    # 2. Aggregate Studios (from video objects directly)
+    studio_counts = {}
+    year_counts = {}
+
+    for v in videos:
+        # Studio
+        studio = v.get('studio')
+        if studio:
+            studio_counts[studio] = studio_counts.get(studio, 0) + 1
+
+        # Year
+        release_date = v.get('release_date')
+        if release_date:
+            try:
+                # Handle ISO format or direct string
+                if hasattr(release_date, 'year'):
+                    year = str(release_date.year)
+                else:
+                    year = release_date[:4]
+                year_counts[year] = year_counts.get(year, 0) + 1
+            except:
+                pass
+
+    studios_result = [{'name': k, 'video_count': v} for k, v in studio_counts.items()]
+    studios_result.sort(key=lambda x: x['video_count'], reverse=True)
+
+    years_result = [{'name': k, 'video_count': v} for k, v in year_counts.items()]
+    years_result.sort(key=lambda x: x['name'], reverse=True)
+
+    # 3. Aggregate Categories (needs join)
+    # Fetch video_categories for these videos
+    # Split into chunks if too many codes
+    category_counts = {}
+    chunk_size = 50
+
+    for i in range(0, len(video_codes), chunk_size):
+        chunk = video_codes[i:i+chunk_size]
+        chunk_filter = ','.join(f'"{c}"' for c in chunk)
+
+        # Get category names directly via join
+        vc_data = await client.get(
+            'video_categories',
+            select='categories(name)',
+            filters={'video_code': f'in.({chunk_filter})'}
+        )
+
+        if vc_data:
+            for item in vc_data:
+                cat = item.get('categories')
+                if cat and cat.get('name'):
+                    name = cat.get('name')
+                    category_counts[name] = category_counts.get(name, 0) + 1
+
+    categories_result = [{'name': k, 'video_count': v} for k, v in category_counts.items()]
+    categories_result.sort(key=lambda x: x['video_count'], reverse=True)
+
+    # 4. Aggregate Cast (needs join)
+    cast_counts = {}
+
+    for i in range(0, len(video_codes), chunk_size):
+        chunk = video_codes[i:i+chunk_size]
+        chunk_filter = ','.join(f'"{c}"' for c in chunk)
+
+        # Get cast names directly via join
+        vc_data = await client.get(
+            'video_cast',
+            select='cast_members(name)',
+            filters={'video_code': f'in.({chunk_filter})'}
+        )
+
+        if vc_data:
+            for item in vc_data:
+                member = item.get('cast_members')
+                if member and member.get('name'):
+                    name = member.get('name')
+                    cast_counts[name] = cast_counts.get(name, 0) + 1
+
+    cast_result = [{'name': k, 'video_count': v} for k, v in cast_counts.items()]
+    cast_result.sort(key=lambda x: x['video_count'], reverse=True)
     
     return {
-        "categories": categories[:20],
-        "studios": studios[:20],
-        "cast": [],
-        "years": []
+        "categories": categories_result[:20],
+        "studios": studios_result[:20],
+        "cast": cast_result[:20],
+        "years": years_result[:20]
     }
 
 
