@@ -9,6 +9,7 @@ interface OptimizedImageProps {
   src: string;
   alt: string;
   className?: string;
+  loading?: 'eager' | 'lazy';
   onLoad?: () => void;
   onError?: () => void;
 }
@@ -17,6 +18,7 @@ const OptimizedImage = memo(function OptimizedImage({
   src,
   alt,
   className = '',
+  loading = 'lazy',
   onLoad,
   onError,
 }: OptimizedImageProps) {
@@ -33,12 +35,22 @@ const OptimizedImage = memo(function OptimizedImage({
 
   // Reset when src changes
   useEffect(() => {
-    setStatus('loading');
-    
     // Check if image is already loaded (cached)
     if (imgRef.current?.complete && imgRef.current?.naturalHeight !== 0) {
-      setStatus('loaded');
+      // Using a timeout to move state update out of the render cycle
+      // This is safe because we're just checking cache status
+      const timer = setTimeout(() => {
+        if (mountedRef.current) {
+          setStatus('loaded');
+        }
+      }, 0);
+      return () => clearTimeout(timer);
     }
+
+    if (status !== 'loading') {
+      setStatus('loading');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
   const handleLoad = () => {
@@ -65,7 +77,7 @@ const OptimizedImage = memo(function OptimizedImage({
 
   return (
     <div className="w-full h-full relative">
-      {/* Image - loads immediately, no lazy loading */}
+      {/* Image - loads based on loading prop */}
       <img
         ref={imgRef}
         src={src}
@@ -73,7 +85,7 @@ const OptimizedImage = memo(function OptimizedImage({
         className={`w-full h-full ${className} ${status === 'loaded' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
         onLoad={handleLoad}
         onError={handleError}
-        loading="eager"
+        loading={loading}
         decoding="async"
         draggable={false}
       />
