@@ -100,9 +100,21 @@ const VideoCard = memo(function VideoCard({
   }, []);
 
   return (
-    <div className="group cursor-pointer" onClick={handleClick}>
+    <article
+      className="group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+      onClick={handleClick}
+      role="link"
+      tabIndex={0}
+      aria-label={`View details for ${video.title}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+    >
       {/* Thumbnail */}
-      <div className="relative rounded-lg overflow-hidden mb-2 aspect-[2/3] bg-gradient-to-br from-zinc-900 to-zinc-800">
+      <div className="relative rounded-lg overflow-hidden mb-2 aspect-[2/3] bg-gradient-to-br from-zinc-900 to-zinc-800" aria-hidden="true">
         {thumbnailUrl && !imageError ? (
           <OptimizedImage
             src={thumbnailUrl}
@@ -113,7 +125,7 @@ const VideoCard = memo(function VideoCard({
         ) : (
           /* Fallback when no image or error */
           <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-zinc-900 to-zinc-800">
-            <Film className="w-8 h-8 text-gray-500" />
+            <Film className="w-8 h-8 text-gray-500" aria-hidden="true" />
             <span className="text-[10px] text-gray-400 font-medium">No Image</span>
           </div>
         )}
@@ -121,14 +133,14 @@ const VideoCard = memo(function VideoCard({
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center">
-            <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
+            <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" aria-hidden="true" />
           </div>
         </div>
 
         {/* Views badge */}
         {video.views > 0 && (
           <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
-            <Eye className="w-3 h-3" />
+            <Eye className="w-3 h-3" aria-hidden="true" />
             {formattedViews}
           </span>
         )}
@@ -136,7 +148,7 @@ const VideoCard = memo(function VideoCard({
         {/* Duration badge */}
         {video.duration && (
           <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 bg-white/10 backdrop-blur-md text-white text-[10px] font-medium px-1.5 py-0.5 rounded border border-white/20">
-            <Clock className="w-3 h-3" />
+            <Clock className="w-3 h-3" aria-hidden="true" />
             {video.duration}
           </span>
         )}
@@ -173,6 +185,7 @@ const VideoCard = memo(function VideoCard({
                   className="w-3 h-3"
                   fill="none"
                   strokeWidth={2}
+                  aria-hidden="true"
                   style={{
                     color: highlightColor || '#ff0040',
                     filter: `drop-shadow(0 0 3px ${highlightColor || '#ff0040'})`
@@ -184,7 +197,7 @@ const VideoCard = memo(function VideoCard({
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison for better memoization
