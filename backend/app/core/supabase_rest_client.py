@@ -83,15 +83,25 @@ class SupabaseRestClient:
             if limit is None and not single:
                 return await self._get_all_paginated(table, select, filters, order, use_admin=use_admin)
             
-            params = {'select': select}
+            # Prepare parameters
+            # Use list of tuples to support repeated keys (e.g. range filters)
+            # Start with select
+            params_list = [('select', select)]
+
+            # Add filters
             if filters:
-                params.update(filters)
+                if isinstance(filters, list):
+                    params_list.extend(filters)
+                elif isinstance(filters, dict):
+                    params_list.extend(filters.items())
+
+            # Add other parameters
             if order:
-                params['order'] = order
+                params_list.append(('order', order))
             if limit is not None:
-                params['limit'] = limit
+                params_list.append(('limit', str(limit)))
             if offset is not None:
-                params['offset'] = offset
+                params_list.append(('offset', str(offset)))
             
             headers = {**(self.admin_headers if use_admin else self.headers)}
             if single:
@@ -100,7 +110,7 @@ class SupabaseRestClient:
             response = await client.get(
                 f"{self.base_url}/{table}",
                 headers=headers,
-                params=params
+                params=params_list
             )
             
             if response.status_code in (200, 206):
@@ -184,7 +194,7 @@ class SupabaseRestClient:
         self,
         table: str,
         select: str = "*",
-        filters: Dict[str, str] = None,
+        filters: Any = None,
         order: str = None,
         limit: int = None,
         offset: int = None
@@ -198,22 +208,30 @@ class SupabaseRestClient:
         try:
             client = await self._get_client()
             
-            params = {'select': select}
+            # Prepare parameters using list of tuples for consistency and to support repeated keys
+            params_list = [('select', select)]
+
+            # Add filters
             if filters:
-                params.update(filters)
+                if isinstance(filters, list):
+                    params_list.extend(filters)
+                elif isinstance(filters, dict):
+                    params_list.extend(filters.items())
+
+            # Add other parameters
             if order:
-                params['order'] = order
+                params_list.append(('order', order))
             if limit is not None:
-                params['limit'] = limit
+                params_list.append(('limit', str(limit)))
             if offset is not None:
-                params['offset'] = offset
+                params_list.append(('offset', str(offset)))
             
             headers = {**self.headers, 'Prefer': 'count=exact'}
             
             response = await client.get(
                 f"{self.base_url}/{table}",
                 headers=headers,
-                params=params
+                params=params_list
             )
             
             if response.status_code in (200, 206):
