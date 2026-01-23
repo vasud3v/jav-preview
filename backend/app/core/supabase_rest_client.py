@@ -3,7 +3,7 @@ Supabase REST API client for the backend.
 Uses httpx for async HTTP requests to Supabase REST API.
 """
 import os
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Union
 import httpx
 from app.core.config import settings
 
@@ -49,11 +49,34 @@ class SupabaseRestClient:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
     
+    def _build_params(
+        self,
+        select: str = "*",
+        filters: Union[Dict[str, str], List[Tuple[str, str]]] = None,
+        order: str = None,
+        limit: int = None,
+        offset: int = None
+    ) -> List[Tuple[str, str]]:
+        """Build query parameters list."""
+        params = [('select', select)]
+        if filters:
+            if isinstance(filters, dict):
+                params.extend(filters.items())
+            else:
+                params.extend(filters)
+        if order:
+            params.append(('order', order))
+        if limit is not None:
+            params.append(('limit', str(limit)))
+        if offset is not None:
+            params.append(('offset', str(offset)))
+        return params
+
     async def get(
         self,
         table: str,
         select: str = "*",
-        filters: Dict[str, str] = None,
+        filters: Union[Dict[str, str], List[Tuple[str, str]]] = None,
         single: bool = False,
         order: str = None,
         limit: int = None,
@@ -66,7 +89,7 @@ class SupabaseRestClient:
         Args:
             table: Table name
             select: Columns to select (default: "*")
-            filters: Dict of filters (column: "eq.value" or "ilike.*value*")
+            filters: Dict or List of tuples of filters
             single: If True, return single object instead of list
             order: Order by column (e.g., "created_at.desc")
             limit: Maximum rows to return (default: None = no limit, fetches all with pagination)
@@ -83,15 +106,7 @@ class SupabaseRestClient:
             if limit is None and not single:
                 return await self._get_all_paginated(table, select, filters, order, use_admin=use_admin)
             
-            params = {'select': select}
-            if filters:
-                params.update(filters)
-            if order:
-                params['order'] = order
-            if limit is not None:
-                params['limit'] = limit
-            if offset is not None:
-                params['offset'] = offset
+            params = self._build_params(select, filters, order, limit, offset)
             
             headers = {**(self.admin_headers if use_admin else self.headers)}
             if single:
@@ -120,7 +135,7 @@ class SupabaseRestClient:
         self,
         table: str,
         select: str = "*",
-        filters: Dict[str, str] = None,
+        filters: Union[Dict[str, str], List[Tuple[str, str]]] = None,
         order: str = None,
         page_size: int = 1000,
         use_admin: bool = False
@@ -131,7 +146,7 @@ class SupabaseRestClient:
         Args:
             table: Table name
             select: Columns to select
-            filters: Dict of filters
+            filters: Dict or List of tuples of filters
             order: Order by column
             page_size: Rows per page (default: 1000, Supabase's default limit)
             use_admin: If True, use service role key to bypass RLS
@@ -143,11 +158,7 @@ class SupabaseRestClient:
         offset = 0
         
         while True:
-            params = {'select': select, 'limit': page_size, 'offset': offset}
-            if filters:
-                params.update(filters)
-            if order:
-                params['order'] = order
+            params = self._build_params(select, filters, order, page_size, offset)
             
             try:
                 client = await self._get_client()
@@ -184,7 +195,7 @@ class SupabaseRestClient:
         self,
         table: str,
         select: str = "*",
-        filters: Dict[str, str] = None,
+        filters: Union[Dict[str, str], List[Tuple[str, str]]] = None,
         order: str = None,
         limit: int = None,
         offset: int = None
@@ -198,15 +209,7 @@ class SupabaseRestClient:
         try:
             client = await self._get_client()
             
-            params = {'select': select}
-            if filters:
-                params.update(filters)
-            if order:
-                params['order'] = order
-            if limit is not None:
-                params['limit'] = limit
-            if offset is not None:
-                params['offset'] = offset
+            params = self._build_params(select, filters, order, limit, offset)
             
             headers = {**self.headers, 'Prefer': 'count=exact'}
             
@@ -237,14 +240,12 @@ class SupabaseRestClient:
             print(f"GET {table} with count error: {e}")
             return [], 0
     
-    async def count(self, table: str, filters: Dict[str, str] = None) -> int:
+    async def count(self, table: str, filters: Union[Dict[str, str], List[Tuple[str, str]]] = None) -> int:
         """Get count of rows matching filters."""
         try:
             client = await self._get_client()
             
-            params = {'select': 'count', 'limit': 0}
-            if filters:
-                params.update(filters)
+            params = self._build_params('count', filters, None, 0, None)
             
             headers = {**self.headers, 'Prefer': 'count=exact'}
             

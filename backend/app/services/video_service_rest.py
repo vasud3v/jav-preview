@@ -4,7 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
 from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
@@ -796,9 +796,11 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
+            # Use aware current time
+            now = datetime.now(timezone.utc)
+            return (now - release_date).days
         except:
             return 999999
     
@@ -940,8 +942,8 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # 3. TRENDING - Recent content with growing engagement
     # Prioritize videos from last 30 days with good view velocity AND like velocity
-    from datetime import datetime, timedelta
-    thirty_days_ago = (datetime.now() - timedelta(days=TRENDING_WINDOW_DAYS)).isoformat()
+    from datetime import datetime, timedelta, timezone
+    thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=TRENDING_WINDOW_DAYS)).isoformat()
     
     trending_candidates = await client.get(
         'videos',
@@ -1019,7 +1021,7 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     print(f"[POPULAR] Final section has {len(popular)} videos")
     
     # 5. NEW RELEASES - Recently released content (last 90 days)
-    ninety_days_ago = (datetime.now() - timedelta(days=NEW_RELEASES_WINDOW_DAYS)).isoformat()
+    ninety_days_ago = (datetime.now(timezone.utc) - timedelta(days=NEW_RELEASES_WINDOW_DAYS)).isoformat()
     print(f"[NEW_RELEASES] Looking for videos after {ninety_days_ago}")
     new_releases_candidates = await client.get(
         'videos',
@@ -1034,7 +1036,7 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # 6. CLASSICS - Older content (>2 years) with proven quality
     # Get classics with good engagement and ratings
-    two_years_ago = (datetime.now() - timedelta(days=365 * CLASSICS_AGE_YEARS)).isoformat()
+    two_years_ago = (datetime.now(timezone.utc) - timedelta(days=365 * CLASSICS_AGE_YEARS)).isoformat()
     
     print(f"[CLASSICS] Looking for videos older than {two_years_ago}")
     
@@ -1063,7 +1065,7 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # If still no results, try with 1 year instead of 2
     if not classics_candidates or len(classics_candidates) == 0:
-        one_year_ago = (datetime.now() - timedelta(days=365)).isoformat()
+        one_year_ago = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
         print(f"[CLASSICS] Trying with 1 year threshold: {one_year_ago}")
         classics_candidates = await client.get(
             'videos',
@@ -1282,7 +1284,7 @@ async def set_video_rating(code: str, user_id: str, rating: int) -> dict:
             'video_code': code,
             'user_id': user_id,
             'rating': rating,
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         },
         upsert=True,
         use_admin=True
@@ -1342,7 +1344,7 @@ async def add_bookmark(code: str, user_id: str) -> bool:
         {
             'video_code': code,
             'user_id': user_id,
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         },
         use_admin=True
     )
@@ -1419,7 +1421,7 @@ async def record_watch(code: str, user_id: str, duration: int = 0, completed: bo
                 'user_id': user_id,
                 'watch_duration': duration,
                 'completed': completed,
-                'watched_at': datetime.utcnow().isoformat()
+                'watched_at': datetime.now(timezone.utc).isoformat()
             },
             upsert=True,
             use_admin=True
@@ -2009,24 +2011,20 @@ async def advanced_search(
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
-    filters = {}
+    filters = []
     
     # Build filters
     if studio:
-        filters['studio'] = f'eq.{studio}'
+        filters.append(('studio', f'eq.{studio}'))
     if series:
-        filters['series'] = f'eq.{series}'
+        filters.append(('series', f'eq.{series}'))
     if date_from:
-        filters['release_date'] = f'gte.{date_from}'
+        filters.append(('release_date', f'gte.{date_from}'))
     if date_to:
-        if 'release_date' in filters:
-            # Can't combine gte and lte in same key
-            pass
-        else:
-            filters['release_date'] = f'lte.{date_to}'
+        filters.append(('release_date', f'lte.{date_to}'))
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        filters.append(('or', f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'))
     
     # Determine order
     order_map = {
@@ -2316,10 +2314,10 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
             
             # Recency bonus (newer content gets slight boost)
             try:
-                from datetime import datetime
+                from datetime import datetime, timezone
                 release_date = video.get('release_date', '')
                 if release_date:
-                    days_old = (datetime.now() - datetime.fromisoformat(release_date.replace('Z', '+00:00'))).days
+                    days_old = (datetime.now(timezone.utc) - datetime.fromisoformat(release_date.replace('Z', '+00:00'))).days
                     recency_bonus = max(0, (365 - min(days_old, 365)) / 365) * 5
                 else:
                     recency_bonus = 0
@@ -2470,28 +2468,62 @@ async def get_related_videos(
 
     # C. Same Cast
     if cast:
-        for cast_name in cast[:3]:
-             cast_data = await client.get('cast_members', filters={'name': f'eq.{cast_name}'}, single=True)
-             if cast_data:
-                 c_id = cast_data['id']
-                 junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
+        # Batch fetch cast IDs
+        target_cast = cast[:3]
+        if target_cast:
+            cast_names_filter = ','.join(f'"{name}"' for name in target_cast)
+            cast_data_list = await client.get(
+                'cast_members',
+                select='id,name',
+                filters={'name': f'in.({cast_names_filter})'}
+            )
+
+            if cast_data_list:
+                cast_ids = [c['id'] for c in cast_data_list]
+
+                # Batch fetch video junctions
+                cast_ids_filter = ','.join(f'"{cid}"' for cid in cast_ids)
+                junctions = await client.get(
+                    'video_cast',
+                    select='video_code,cast_id',
+                    filters={'cast_id': f'in.({cast_ids_filter})'},
+                    limit=50
+                )
+
+                if junctions:
+                    # Count occurrences (video might appear for multiple cast members)
+                    code_counts = {}
+                    for j in junctions:
+                        c = j['video_code']
+                        code_counts[c] = code_counts.get(c, 0) + 1
+
+                    # Boost existing candidates
+                    for code, count in code_counts.items():
+                         if code in seen_codes:
+                             for cand in candidates:
+                                 if cand['code'] == code:
+                                     cand['_score'] += (w_cast * count)
+
+                    # Fetch new candidates
+                    new_codes = [c for c in code_counts.keys() if c not in seen_codes]
+
+                    if new_codes:
+                         new_codes = new_codes[:20]
+                         codes_filter = ','.join(f'"{c}"' for c in new_codes)
+
+                         cast_vids = await client.get(
+                             'videos',
+                             select='code,title,thumbnail_url,duration,release_date,studio,views',
+                             filters={'code': f'in.({codes_filter})'}
+                         )
+
                          if cast_vids:
                              for v in cast_vids:
                                  if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
+                                     count = code_counts.get(v['code'], 1)
+                                     v['_score'] = w_cast * count
                                      candidates.append(v)
                                      seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
 
     # D. Same Categories
     if categories:
