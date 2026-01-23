@@ -180,7 +180,7 @@ export default function SearchInput({
           className={`w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 ${compact ? 'py-2 pl-10 pr-8 text-sm' : 'py-2.5 pl-11 pr-10'
             }`}
         />
-        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 ${compact ? 'w-4 h-4' : 'w-4 h-4'}`} />
+        <Search aria-hidden="true" className={`absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 ${compact ? 'w-4 h-4' : 'w-4 h-4'}`} />
         {query && (
           <button
             type="button"
@@ -190,8 +190,10 @@ export default function SearchInput({
               inputRef.current?.focus();
             }}
             className={`absolute top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer ${compact ? 'right-2' : 'right-3'}`}
+            aria-label="Clear search"
+            title="Clear search"
           >
-            <X className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
+            <X aria-hidden="true" className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
           </button>
         )}
       </form>
