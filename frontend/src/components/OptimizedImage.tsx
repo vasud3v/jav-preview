@@ -1,6 +1,6 @@
 /**
- * Simple Image Component - No Lazy Loading
- * Loads all images immediately for maximum compatibility
+ * Optimized Image Component
+ * Supports native lazy loading with eager loading option
  */
 
 import { useState, useRef, useEffect, memo } from 'react';
@@ -11,6 +11,7 @@ interface OptimizedImageProps {
   className?: string;
   onLoad?: () => void;
   onError?: () => void;
+  loading?: 'lazy' | 'eager';
 }
 
 const OptimizedImage = memo(function OptimizedImage({
@@ -19,10 +20,17 @@ const OptimizedImage = memo(function OptimizedImage({
   className = '',
   onLoad,
   onError,
+  loading = 'lazy',
 }: OptimizedImageProps) {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [prevSrc, setPrevSrc] = useState(src);
   const imgRef = useRef<HTMLImageElement>(null);
   const mountedRef = useRef(true);
+
+  if (src !== prevSrc) {
+    setPrevSrc(src);
+    setStatus('loading');
+  }
 
   useEffect(() => {
     mountedRef.current = true;
@@ -31,12 +39,10 @@ const OptimizedImage = memo(function OptimizedImage({
     };
   }, []);
 
-  // Reset when src changes
+  // Check if image is already loaded (cached)
   useEffect(() => {
-    setStatus('loading');
-    
-    // Check if image is already loaded (cached)
     if (imgRef.current?.complete && imgRef.current?.naturalHeight !== 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus('loaded');
     }
   }, [src]);
@@ -65,7 +71,7 @@ const OptimizedImage = memo(function OptimizedImage({
 
   return (
     <div className="w-full h-full relative">
-      {/* Image - loads immediately, no lazy loading */}
+      {/* Image with configurable loading strategy */}
       <img
         ref={imgRef}
         src={src}
@@ -73,7 +79,7 @@ const OptimizedImage = memo(function OptimizedImage({
         className={`w-full h-full ${className} ${status === 'loaded' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
         onLoad={handleLoad}
         onError={handleError}
-        loading="eager"
+        loading={loading}
         decoding="async"
         draggable={false}
       />
