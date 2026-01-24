@@ -10,10 +10,16 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 mt-8">
+    <nav
+      role="navigation"
+      aria-label="Pagination"
+      className="flex items-center justify-center gap-2 mt-8"
+    >
       <button
+        type="button"
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
+        aria-label="Go to previous page"
         className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 cursor-pointer"
       >
         <ChevronLeft className="w-5 h-5" />
@@ -24,12 +30,14 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
       </span>
 
       <button
+        type="button"
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
+        aria-label="Go to next page"
         className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-100 cursor-pointer"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
-    </div>
+    </nav>
   );
 }
