@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 import httpx
+import asyncio
 from urllib.parse import unquote, quote, urlparse
 import hashlib
 import ipaddress
@@ -50,7 +51,7 @@ def cache_key(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
-def validate_url(url: str) -> str:
+async def validate_url(url: str) -> str:
     """
     Validate URL to prevent SSRF and other attacks.
     Returns the valid URL or raises HTTPException.
@@ -71,8 +72,6 @@ def validate_url(url: str) -> str:
         raise HTTPException(status_code=400, detail="Invalid URL hostname")
 
     # Block localhost and private IPs
-    # This is a basic check. For full SSRF protection, DNS resolution should be checked.
-    # However, blocking common private ranges helps.
 
     # 1. Check for localhost strings
     if hostname.lower() in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
@@ -85,10 +84,24 @@ def validate_url(url: str) -> str:
             raise HTTPException(status_code=403, detail="Access to private IP denied")
     except ValueError:
         # Not an IP address, it's a domain name.
-        # Ideally we should resolve it and check the IP, but that adds latency.
-        # For now we rely on the fact that we trust the upstream DNS or that
-        # attackers can't easily make public DNS point to internal IPs in this context.
-        pass
+        # Resolve it and check the IP.
+        try:
+            loop = asyncio.get_running_loop()
+            # Resolve to IPs
+            addr_info = await loop.getaddrinfo(hostname, None)
+            for _, _, _, _, sockaddr in addr_info:
+                ip_str = sockaddr[0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        raise HTTPException(status_code=403, detail="Access to private IP denied (resolved)")
+                except ValueError:
+                    continue
+        except HTTPException:
+            raise
+        except Exception:
+            # If resolution fails, it might be a temporary DNS issue or invalid domain.
+            pass
 
     return url
 
@@ -97,7 +110,7 @@ def validate_url(url: str) -> str:
 async def proxy_m3u8(url: str, request: Request):
     """Proxy HLS m3u8 playlist with caching."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -174,7 +187,7 @@ async def proxy_m3u8(url: str, request: Request):
 async def proxy_ts(url: str, request: Request):
     """Proxy video segments with aggressive caching."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -233,7 +246,7 @@ async def proxy_ts(url: str, request: Request):
 async def proxy_image(url: str):
     """Proxy images with aggressive caching and optimization."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
