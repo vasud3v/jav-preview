@@ -7,8 +7,35 @@ import uuid
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+def validate_file_content(content: bytes) -> tuple[str, str]:
+    """
+    Validate file content using magic numbers.
+    Returns (content_type, extension) if valid.
+    Raises ValueError if invalid.
+    """
+    if len(content) < 12:  # Minimum needed for WebP check
+        raise ValueError("File too small")
+
+    # JPEG: FF D8 FF
+    if content.startswith(b'\xFF\xD8\xFF'):
+        return "image/jpeg", "jpg"
+
+    # PNG: 89 50 4E 47 0D 0A 1A 0A
+    if content.startswith(b'\x89PNG\r\n\x1a\n'):
+        return "image/png", "png"
+
+    # GIF: GIF87a or GIF89a
+    if content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+        return "image/gif", "gif"
+
+    # WebP: RIFF....WEBP
+    if content.startswith(b'RIFF') and content[8:12] == b'WEBP':
+        return "image/webp", "webp"
+
+    raise ValueError("Invalid file signature. Only JPEG, PNG, GIF, and WebP are allowed.")
 
 
 def get_storage_client():
@@ -25,19 +52,20 @@ async def upload_avatar(
 ):
     """Upload user avatar to Supabase storage."""
     
-    # Validate file type
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG, PNG, GIF, or WebP.")
-    
     # Read file content
     content = await file.read()
     
     # Validate file size
     if len(content) > MAX_SIZE:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB.")
+
+    # Validate file content and get real type
+    try:
+        content_type, ext = validate_file_content(content)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file content. Must be a valid image (JPEG, PNG, GIF, WebP).")
     
-    # Generate unique filename
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    # Generate unique filename using validated extension
     filename = f"{user['id']}/{uuid.uuid4()}.{ext}"
     
     try:
@@ -57,7 +85,7 @@ async def upload_avatar(
         result = supabase.storage.from_("avatars").upload(
             filename,
             content,
-            {"content-type": file.content_type}
+            {"content-type": content_type}
         )
         
         # Get public URL
