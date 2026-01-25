@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Menu, X, Home, Calendar, Grid3X3, Users, Building2, Film, User, LogOut, Settings, Bookmark, Heart } from 'lucide-react';
 import AuthModal from '@/components/AuthModal';
@@ -16,6 +16,18 @@ const Navbar = () => {
   const { color } = useNeonColor();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -132,6 +144,7 @@ const Navbar = () => {
                   <button
                     onClick={() => setIsSearchOpen(true)}
                     className="p-2 rounded-lg transition-all duration-300 cursor-pointer"
+                    title="Search (Ctrl+K)"
                     style={{ color: 'var(--muted-foreground)' }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = color.hex;

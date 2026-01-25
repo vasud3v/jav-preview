@@ -163,8 +163,9 @@ export default function SearchInput({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <form onSubmit={handleSubmit} className="relative">
+      <form onSubmit={handleSubmit} className="relative" role="search">
         <input
+          aria-label="Search query"
           ref={inputRef}
           type="text"
           value={query}
@@ -184,6 +185,7 @@ export default function SearchInput({
         {query && (
           <button
             type="button"
+            aria-label="Clear search"
             onClick={() => {
               setQuery('');
               setSuggestions([]);
