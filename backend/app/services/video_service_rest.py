@@ -49,6 +49,16 @@ VIEW_VELOCITY_WEIGHT = 0.6  # Weight for view velocity in trending
 RECENCY_BOOST_FACTOR = 1.5  # Boost factor for recent content
 
 
+def sanitize_for_postgrest(query: str) -> str:
+    """Sanitize query to prevent PostgREST syntax errors."""
+    if not query:
+        return ""
+    # Replace PostgREST control characters with spaces
+    # Also replace . as it is an operator separator in PostgREST filters
+    safe = query.replace('(', ' ').replace(')', ' ').replace(',', ' ').replace('.', ' ')
+    return safe.strip()
+
+
 async def _get_ratings_for_videos(video_codes: list) -> dict:
     """Get rating statistics for multiple videos efficiently."""
     if not video_codes:
@@ -374,7 +384,8 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    safe_query = sanitize_for_postgrest(query)
+    search_term = f'*{safe_query}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -1860,8 +1871,8 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
 
     # Sanitize query to prevent filter syntax errors
     # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
-    search_term = f'*{safe_query.strip()}*'
+    safe_query = sanitize_for_postgrest(query)
+    search_term = f'*{safe_query}*'
 
     # Fetch videos matching query (larger limit for facets)
     videos = await client.get(
@@ -2026,7 +2037,8 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = sanitize_for_postgrest(query)
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {
@@ -2470,52 +2482,87 @@ async def get_related_videos(
 
     # C. Same Cast
     if cast:
-        for cast_name in cast[:3]:
-             cast_data = await client.get('cast_members', filters={'name': f'eq.{cast_name}'}, single=True)
-             if cast_data:
-                 c_id = cast_data['id']
-                 junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cast_vids:
-                             for v in cast_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
+        cast_names = cast[:5]
+        cast_filter = ','.join(f'"{name}"' for name in cast_names)
+        cast_data_list = await client.get('cast_members', select='id', filters={'name': f'in.({cast_filter})'})
+
+        if cast_data_list:
+            cast_ids = [str(c['id']) for c in cast_data_list]
+            cast_ids_filter = ','.join(cast_ids)
+
+            junctions = await client.get(
+                'video_cast',
+                select='video_code',
+                filters={'cast_id': f'in.({cast_ids_filter})'},
+                limit=30
+            )
+
+            if junctions:
+                junction_codes = [j['video_code'] for j in junctions]
+
+                # Identify new codes to fetch
+                codes_to_fetch = set()
+                for code in junction_codes:
+                    if code in seen_codes:
+                        # Boost existing
+                        for cand in candidates:
+                            if cand['code'] == code:
+                                cand['_score'] += w_cast
+                    else:
+                        codes_to_fetch.add(code)
+
+                # Fetch new videos
+                if codes_to_fetch:
+                    fetch_list = list(codes_to_fetch)[:20]
+                    codes_filter = ','.join(f'"{c}"' for c in fetch_list)
+                    cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
+
+                    if cast_vids:
+                        for v in cast_vids:
+                            v['_score'] = w_cast
+                            candidates.append(v)
+                            seen_codes.add(v['code'])
 
     # D. Same Categories
     if categories:
-        for cat_name in categories[:3]:
-             cat_data = await client.get('categories', filters={'name': f'eq.{cat_name}'}, single=True)
-             if cat_data:
-                 c_id = cat_data['id']
-                 junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cat_vids:
-                             for v in cat_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cat
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cat
+        cat_names = categories[:5]
+        cat_filter = ','.join(f'"{name}"' for name in cat_names)
+        cat_data_list = await client.get('categories', select='id', filters={'name': f'in.({cat_filter})'})
+
+        if cat_data_list:
+            cat_ids = [str(c['id']) for c in cat_data_list]
+            cat_ids_filter = ','.join(cat_ids)
+
+            junctions = await client.get(
+                'video_categories',
+                select='video_code',
+                filters={'category_id': f'in.({cat_ids_filter})'},
+                limit=30
+            )
+
+            if junctions:
+                junction_codes = [j['video_code'] for j in junctions]
+
+                codes_to_fetch = set()
+                for code in junction_codes:
+                    if code in seen_codes:
+                        # Boost existing
+                        for cand in candidates:
+                            if cand['code'] == code:
+                                cand['_score'] += w_cat
+                    else:
+                        codes_to_fetch.add(code)
+
+                if codes_to_fetch:
+                    fetch_list = list(codes_to_fetch)[:20]
+                    codes_filter = ','.join(f'"{c}"' for c in fetch_list)
+                    cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
+
+                    if cat_vids:
+                        for v in cat_vids:
+                            v['_score'] = w_cat
+                            candidates.append(v)
+                            seen_codes.add(v['code'])
 
     # Refine Scores
     import math
