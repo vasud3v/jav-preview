@@ -80,9 +80,11 @@ export default function VideoDetail() {
         // Send increment to backend (fire and forget)
         api.incrementView(code).catch(() => { });
         
-        // Record watch for recommendations (disabled - backend issue causes 404)
-        // const watchUserId = getAnonymousUserId();
-        // api.recordWatch(code, watchUserId).catch(() => {});
+        // Record watch for recommendations
+        const watchUserId = getAnonymousUserId();
+        api.recordWatch(code, watchUserId).catch((err) => {
+          console.warn('Failed to record watch history:', err);
+        });
       } else {
         // Not a new view, just set the data
         setVideo(data);
