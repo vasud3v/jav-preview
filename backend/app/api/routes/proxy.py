@@ -5,6 +5,8 @@ import httpx
 from urllib.parse import unquote, quote, urlparse
 import hashlib
 import ipaddress
+import asyncio
+import socket
 
 from app.core.cache import playlist_cache, segment_cache, image_cache
 
@@ -50,7 +52,7 @@ def cache_key(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
-def validate_url(url: str) -> str:
+async def validate_url(url: str) -> str:
     """
     Validate URL to prevent SSRF and other attacks.
     Returns the valid URL or raises HTTPException.
@@ -85,10 +87,30 @@ def validate_url(url: str) -> str:
             raise HTTPException(status_code=403, detail="Access to private IP denied")
     except ValueError:
         # Not an IP address, it's a domain name.
-        # Ideally we should resolve it and check the IP, but that adds latency.
-        # For now we rely on the fact that we trust the upstream DNS or that
-        # attackers can't easily make public DNS point to internal IPs in this context.
-        pass
+        # Check DNS resolution to ensure it doesn't resolve to a private IP
+        try:
+            loop = asyncio.get_running_loop()
+            # Resolve hostname to IPs
+            # getaddrinfo returns a list of tuples (family, type, proto, canonname, sockaddr)
+            # sockaddr is (address, port) for AF_INET
+            addr_info = await loop.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+
+            for family, _, _, _, sockaddr in addr_info:
+                ip_str = sockaddr[0]
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        raise HTTPException(status_code=403, detail="Access to private IP denied")
+                except ValueError:
+                    continue
+        except socket.gaierror:
+            # DNS resolution failed, treat as invalid URL
+            raise HTTPException(status_code=400, detail="Invalid hostname")
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Fallback for safety
+            raise HTTPException(status_code=403, detail=f"Validation error: {str(e)}")
 
     return url
 
@@ -97,7 +119,7 @@ def validate_url(url: str) -> str:
 async def proxy_m3u8(url: str, request: Request):
     """Proxy HLS m3u8 playlist with caching."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -174,7 +196,7 @@ async def proxy_m3u8(url: str, request: Request):
 async def proxy_ts(url: str, request: Request):
     """Proxy video segments with aggressive caching."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
@@ -233,7 +255,7 @@ async def proxy_ts(url: str, request: Request):
 async def proxy_image(url: str):
     """Proxy images with aggressive caching and optimization."""
     decoded_url = unquote(url)
-    validate_url(decoded_url)
+    await validate_url(decoded_url)
     key = cache_key(decoded_url)
     
     # Check cache
