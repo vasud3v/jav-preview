@@ -4,6 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
+import random
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
@@ -311,26 +312,30 @@ async def get_random_video_code(exclude: List[str] = None) -> Optional[str]:
     if count == 0:
         return None
     
-    # Get random offset
     import random
-    offset = random.randint(0, max(0, count - 1))
     
-    videos = await client.get(
-        'videos',
-        select='code',
-        limit=1,
-        offset=offset
-    )
-    
-    if videos and len(videos) > 0:
-        code = videos[0].get('code')
-        if exclude and code in exclude:
-            # Try again with different offset
-            offset = random.randint(0, max(0, count - 1))
-            videos = await client.get('videos', select='code', limit=1, offset=offset)
-            if videos:
-                return videos[0].get('code')
-        return code
+    # Retry loop to find non-excluded video
+    for _ in range(5):
+        # Get random offset
+        # Fetch a small batch to increase chance of finding non-excluded video
+        offset = random.randint(0, max(0, count - 1))
+
+        videos = await client.get(
+            'videos',
+            select='code',
+            limit=5,
+            offset=offset
+        )
+
+        if videos:
+            # Shuffle batch for better randomness
+            random.shuffle(videos)
+
+            for v in videos:
+                code = v.get('code')
+                if code and (not exclude or code not in exclude):
+                    return code
+
     return None
 
 
@@ -365,6 +370,19 @@ async def get_videos(
     return await _paginate(items, total, page, page_size)
 
 
+def _sanitize_search_query(query: str) -> str:
+    """Sanitize search query to prevent PostgREST syntax errors."""
+    if not query:
+        return ""
+    # Remove characters that break PostgREST syntax
+    # Replace with space
+    sanitized = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    # Also replace * to avoid wildcard injection
+    sanitized = sanitized.replace('*', ' ')
+    # Collapse multiple spaces
+    return " ".join(sanitized.split())
+
+
 async def search_videos(query: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
     """Search videos by title, code, or description."""
     client = get_supabase_rest()
@@ -374,7 +392,8 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    safe_query = _sanitize_search_query(query)
+    search_term = f'*{safe_query}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -1195,25 +1214,34 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
 # ============================================
 
 async def increment_views(code: str) -> bool:
-    """Increment view count for a video."""
+    """Increment view count for a video with optimistic locking."""
     client = get_supabase_rest()
     
-    # Get current views
-    video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
-    if not video:
-        return False
-    
-    current_views = video.get('views') or 0
-    
-    # Update views
-    result = await client.update(
-        'videos',
-        {'views': current_views + 1},
-        filters={'code': f'eq.{code}'},
-        use_admin=True
-    )
-    
-    return result is not None
+    # Retry loop for optimistic locking
+    for _ in range(3):
+        # Get current views
+        video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
+        if not video:
+            return False
+
+        current_views = video.get('views') or 0
+
+        # Update views with optimistic lock
+        # Only update if views is still current_views
+        result = await client.update(
+            'videos',
+            {'views': current_views + 1},
+            filters={'code': f'eq.{code}', 'views': f'eq.{current_views}'},
+            use_admin=True
+        )
+
+        if result:
+            return True
+
+        # If failed (concurrent update), retry after small delay
+        await asyncio.sleep(0.05)
+
+    return False
 
 
 async def get_video_rating(code: str) -> dict:
@@ -1859,9 +1887,8 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
     client = get_supabase_rest()
 
     # Sanitize query to prevent filter syntax errors
-    # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
-    search_term = f'*{safe_query.strip()}*'
+    safe_query = _sanitize_search_query(query)
+    search_term = f'*{safe_query}*'
 
     # Fetch videos matching query (larger limit for facets)
     videos = await client.get(
@@ -2026,7 +2053,8 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = _sanitize_search_query(query)
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {
