@@ -365,16 +365,29 @@ async def get_videos(
     return await _paginate(items, total, page, page_size)
 
 
+def _sanitize_search_query(query: str) -> str:
+    """Sanitize search query for PostgREST syntax."""
+    if not query:
+        return ""
+    # Replace PostgREST reserved characters with spaces to prevent injection
+    # Comma separates conditions in 'or' filters
+    # Parentheses group conditions
+    return query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+
+
 async def search_videos(query: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
     """Search videos by title, code, or description."""
     client = get_supabase_rest()
     
     offset = (page - 1) * page_size
     
+    # Sanitize query to prevent syntax injection
+    safe_query = _sanitize_search_query(query)
+    search_term = f'*{safe_query.strip()}*'
+
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -429,6 +442,11 @@ async def get_videos_by_category(category: str, page: int = 1, page_size: int = 
         order='release_date.desc'
     )
     
+    # Handle orphaned records (junction exists but video doesn't)
+    if videos and len(videos) < len(junctions):
+        diff = len(junctions) - len(videos)
+        total = max(0, total - diff)
+
     items = await _videos_to_list_items(videos)
     return await _paginate(items, total, page, page_size)
 
@@ -468,6 +486,11 @@ async def get_videos_by_cast(cast_name: str, page: int = 1, page_size: int = 20)
         order='release_date.desc'
     )
     
+    # Handle orphaned records
+    if videos and len(videos) < len(junctions):
+        diff = len(junctions) - len(videos)
+        total = max(0, total - diff)
+
     items = await _videos_to_list_items(videos)
     return await _paginate(items, total, page, page_size)
 
@@ -796,10 +819,21 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime
+            if not release_date_str:
+                return 999999
+
+            from datetime import datetime, timezone
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
-        except:
+
+            # Handle timezone awareness
+            if release_date.tzinfo:
+                now = datetime.now(timezone.utc)
+            else:
+                now = datetime.now()
+
+            return (now - release_date).days
+        except Exception as e:
+            print(f"Error parsing date '{release_date_str}': {e}")
             return 999999
     
     # Helper to score videos with multiple factors
@@ -1815,6 +1849,10 @@ async def get_search_suggestions(query: str, limit: int = 10) -> dict:
     if not query or len(query) < 2:
         return {"suggestions": []}
     
+    safe_query = _sanitize_search_query(query).strip()
+    if not safe_query:
+        return {"suggestions": []}
+
     client = get_supabase_rest()
     suggestions = []
     
@@ -1822,7 +1860,7 @@ async def get_search_suggestions(query: str, limit: int = 10) -> dict:
     videos = await client.get(
         'videos',
         select='code,title',
-        filters={'or': f'(code.ilike.*{query}*,title.ilike.*{query}*)'},
+        filters={'or': f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*)'},
         limit=5
     )
     
@@ -1859,8 +1897,7 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
     client = get_supabase_rest()
 
     # Sanitize query to prevent filter syntax errors
-    # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    safe_query = _sanitize_search_query(query)
     search_term = f'*{safe_query.strip()}*'
 
     # Fetch videos matching query (larger limit for facets)
@@ -2026,7 +2063,8 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = _sanitize_search_query(query)
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {
@@ -2397,8 +2435,19 @@ async def get_related_videos(
     source_series = video.get('series')
 
     # 2. Build candidates based on strategy
-    candidates = []
-    seen_codes = {code} # Exclude source video
+    candidates = {} # map code -> video
+    excluded_codes = {code} # Exclude source video
+
+    def add_or_boost(video, score):
+        code = video['code']
+        if code in excluded_codes:
+            return
+
+        if code in candidates:
+            candidates[code]['_score'] += score
+        else:
+            video['_score'] = score
+            candidates[code] = video
 
     # Weights for scoring
     w_series = 0
@@ -2434,7 +2483,7 @@ async def get_related_videos(
                 filters={'user_id': f'eq.{user_id}'}
             )
             for h in watch_history or []:
-                seen_codes.add(h['video_code'])
+                excluded_codes.add(h['video_code'])
 
     # Fetch Candidates
 
@@ -2448,10 +2497,7 @@ async def get_related_videos(
         )
         if series_videos:
             for v in series_videos:
-                if v['code'] not in seen_codes:
-                    v['_score'] = w_series
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                add_or_boost(v, w_series)
 
     # B. Same Studio
     if source_studio:
@@ -2463,10 +2509,7 @@ async def get_related_videos(
         )
         if studio_videos:
             for v in studio_videos:
-                if v['code'] not in seen_codes:
-                    v['_score'] = w_studio
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                add_or_boost(v, w_studio)
 
     # C. Same Cast
     if cast:
@@ -2477,21 +2520,22 @@ async def get_related_videos(
                  junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
                  if junctions:
                      codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+
+                     # Identify which to fetch (not in candidates map yet) and which to boost
+                     to_fetch = [c for c in codes if c not in candidates and c not in excluded_codes]
+                     to_boost = [c for c in codes if c in candidates]
+
+                     # Boost existing
+                     for c in to_boost:
+                         candidates[c]['_score'] += w_cast
+
+                     # Fetch new
+                     if to_fetch:
+                         codes_filter = ','.join(f'"{c}"' for c in to_fetch)
                          cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
                          if cast_vids:
                              for v in cast_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
+                                 add_or_boost(v, w_cast)
 
     # D. Same Categories
     if categories:
@@ -2502,47 +2546,50 @@ async def get_related_videos(
                  junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
                  if junctions:
                      codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+
+                     # Identify which to fetch and which to boost
+                     to_fetch = [c for c in codes if c not in candidates and c not in excluded_codes]
+                     to_boost = [c for c in codes if c in candidates]
+
+                     # Boost existing
+                     for c in to_boost:
+                         candidates[c]['_score'] += w_cat
+
+                     # Fetch new
+                     if to_fetch:
+                         codes_filter = ','.join(f'"{c}"' for c in to_fetch)
                          cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
                          if cat_vids:
                              for v in cat_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cat
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cat
+                                 add_or_boost(v, w_cat)
 
     # Refine Scores
     import math
-    for v in candidates:
+    for v in candidates.values():
         # Add popularity score
         views = v.get('views', 0)
         pop_score = math.log10(max(views, 1) + 1) * w_pop
         v['_score'] += pop_score
 
-    # Sort
-    candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
+    # Convert to list and sort
+    final_candidates = list(candidates.values())
+    final_candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
 
     # Fill if not enough
-    if len(candidates) < limit:
+    if len(final_candidates) < limit:
         # Fetch popular/trending to fill
-        needed = limit - len(candidates)
+        needed = limit - len(final_candidates)
         filler = await client.get('videos', order='views.desc', limit=needed + 10)
         if filler:
             for v in filler:
-                if len(candidates) >= limit:
+                if len(final_candidates) >= limit:
                     break
-                if v['code'] not in seen_codes:
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                if v['code'] not in excluded_codes and v['code'] not in candidates:
+                    final_candidates.append(v)
+                    excluded_codes.add(v['code']) # Not strictly needed but consistent
 
     # Limit
-    final_items = candidates[:limit]
+    final_items = final_candidates[:limit]
 
     # Convert to items
     items = await _videos_to_list_items(final_items)
