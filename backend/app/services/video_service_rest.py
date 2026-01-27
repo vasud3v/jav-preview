@@ -2468,54 +2468,102 @@ async def get_related_videos(
                     candidates.append(v)
                     seen_codes.add(v['code'])
 
-    # C. Same Cast
-    if cast:
-        for cast_name in cast[:3]:
-             cast_data = await client.get('cast_members', filters={'name': f'eq.{cast_name}'}, single=True)
-             if cast_data:
-                 c_id = cast_data['id']
-                 junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cast_vids:
-                             for v in cast_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
+    # Helper to add or boost candidates
+    def add_or_boost(video_list, score_boost):
+        for vid in video_list:
+            if vid['code'] not in seen_codes:
+                vid['_score'] = score_boost
+                candidates.append(vid)
+                seen_codes.add(vid['code'])
+            else:
+                # Boost existing candidate
+                for cand in candidates:
+                    if cand['code'] == vid['code']:
+                        cand['_score'] += score_boost
 
-    # D. Same Categories
+    # C. Same Cast (Optimized)
+    if cast:
+        cast_names = cast[:3]
+        if cast_names:
+            # 1. Batch get cast IDs
+            cast_filter = ','.join(f'"{n}"' for n in cast_names)
+            cast_members = await client.get(
+                'cast_members',
+                select='id',
+                filters={'name': f'in.({cast_filter})'}
+            )
+
+            if cast_members:
+                cast_ids = [c['id'] for c in cast_members]
+                if cast_ids:
+                    # IDs are integers, so don't quote them
+                    cast_ids_filter = ','.join(str(cid) for cid in cast_ids)
+
+                    # 2. Batch get junctions (fetch enough to cover ~5 per cast member)
+                    junctions = await client.get(
+                        'video_cast',
+                        select='video_code',
+                        filters={'cast_id': f'in.({cast_ids_filter})'},
+                        limit=20
+                    )
+
+                    if junctions:
+                        codes = [j['video_code'] for j in junctions]
+                        needed_codes = list(set(c for c in codes if c not in seen_codes))
+
+                        if needed_codes:
+                            # 3. Batch get videos
+                            codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+                            cast_vids = await client.get(
+                                'videos',
+                                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                                filters={'code': f'in.({codes_filter})'}
+                            )
+
+                            if cast_vids:
+                                add_or_boost(cast_vids, w_cast)
+
+    # D. Same Categories (Optimized)
     if categories:
-        for cat_name in categories[:3]:
-             cat_data = await client.get('categories', filters={'name': f'eq.{cat_name}'}, single=True)
-             if cat_data:
-                 c_id = cat_data['id']
-                 junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cat_vids:
-                             for v in cat_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cat
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cat
+        cat_names = categories[:3]
+        if cat_names:
+            # 1. Batch get category IDs
+            cat_filter = ','.join(f'"{n}"' for n in cat_names)
+            cat_data_list = await client.get(
+                'categories',
+                select='id',
+                filters={'name': f'in.({cat_filter})'}
+            )
+
+            if cat_data_list:
+                cat_ids = [c['id'] for c in cat_data_list]
+                if cat_ids:
+                    # IDs are integers, so don't quote them
+                    cat_ids_filter = ','.join(str(cid) for cid in cat_ids)
+
+                    # 2. Batch get junctions
+                    junctions = await client.get(
+                        'video_categories',
+                        select='video_code',
+                        filters={'category_id': f'in.({cat_ids_filter})'},
+                        limit=20
+                    )
+
+                    if junctions:
+                        codes = [j['video_code'] for j in junctions]
+                        needed_codes = list(set(c for c in codes if c not in seen_codes))
+
+                        if needed_codes:
+                            # 3. Batch get videos
+                            codes_filter = ','.join(f'"{c}"' for c in needed_codes)
+                            cat_vids = await client.get(
+                                'videos',
+                                select='code,title,thumbnail_url,duration,release_date,studio,views',
+                                filters={'code': f'in.({codes_filter})'}
+                            )
+
+                            if cat_vids:
+                                add_or_boost(cat_vids, w_cat)
 
     # Refine Scores
     import math
