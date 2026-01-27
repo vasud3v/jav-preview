@@ -103,13 +103,13 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-2">
           {mode === 'forgot-password' ? (
-            <button onClick={goBackToLogin} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer">
+            <button onClick={goBackToLogin} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer" aria-label="Go back">
               <ArrowLeft size={20} />
             </button>
           ) : (
             <div />
           )}
-          <button onClick={handleClose} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer">
+          <button onClick={handleClose} className="p-1 text-zinc-400 hover:text-zinc-100 cursor-pointer" aria-label="Close">
             <X size={20} />
           </button>
         </div>
@@ -197,6 +197,7 @@ const AuthModal = ({ isOpen, mode: initialMode, onClose, onSwitchMode }: AuthMod
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>

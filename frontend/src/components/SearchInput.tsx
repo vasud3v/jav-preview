@@ -176,6 +176,7 @@ export default function SearchInput({
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          aria-label="Search query"
           autoFocus={autoFocus}
           className={`w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 ${compact ? 'py-2 pl-10 pr-8 text-sm' : 'py-2.5 pl-11 pr-10'
             }`}
@@ -190,6 +191,7 @@ export default function SearchInput({
               inputRef.current?.focus();
             }}
             className={`absolute top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer ${compact ? 'right-2' : 'right-3'}`}
+            aria-label="Clear search"
           >
             <X className={compact ? 'w-4 h-4' : 'w-5 h-5'} />
           </button>
