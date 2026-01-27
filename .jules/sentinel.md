@@ -1,0 +1,4 @@
+## 2025-02-18 - SSRF Vulnerability in Proxy Service
+**Vulnerability:** The `validate_url` function in `backend/app/api/routes/proxy.py` validated hostnames by string inspection only, failing to resolve domains to their IP addresses. This allowed attackers to bypass private IP blocks by using domains that resolve to localhost or internal network addresses (DNS Rebinding/Pinning risk).
+**Learning:** Reliance on `httpx`'s default behavior without a custom transport adapter or pre-validation of resolved IPs leaves applications vulnerable to SSRF. String-based blacklisting of "localhost" is insufficient.
+**Prevention:** Always resolve the hostname to its IP address(es) and validate those IPs against a blocklist (private/loopback ranges) *before* making the request, or configure the HTTP client to reject connections to private IP ranges at the socket level.
