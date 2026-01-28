@@ -2397,7 +2397,10 @@ async def get_related_videos(
     source_series = video.get('series')
 
     # 2. Build candidates based on strategy
-    candidates = []
+    # Use dictionary to track scores and deduplicate: code -> score
+    from collections import defaultdict
+    video_scores = defaultdict(float)
+
     seen_codes = {code} # Exclude source video
 
     # Weights for scoring
@@ -2440,111 +2443,146 @@ async def get_related_videos(
 
     # A. Same Series (Strongest signal)
     if source_series:
+        # Fetch codes only to save bandwidth
         series_videos = await client.get(
             'videos',
-            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            select='code',
             filters={'series': f'eq.{source_series}'},
             limit=10
         )
         if series_videos:
             for v in series_videos:
                 if v['code'] not in seen_codes:
-                    v['_score'] = w_series
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                    video_scores[v['code']] += w_series
 
     # B. Same Studio
     if source_studio:
         studio_videos = await client.get(
             'videos',
-            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            select='code',
             filters={'studio': f'eq.{source_studio}'},
             limit=10
         )
         if studio_videos:
             for v in studio_videos:
                 if v['code'] not in seen_codes:
-                    v['_score'] = w_studio
-                    candidates.append(v)
-                    seen_codes.add(v['code'])
+                    video_scores[v['code']] += w_studio
 
-    # C. Same Cast
+    # C. Same Cast (Optimized: Batch Fetch)
     if cast:
-        for cast_name in cast[:3]:
-             cast_data = await client.get('cast_members', filters={'name': f'eq.{cast_name}'}, single=True)
-             if cast_data:
-                 c_id = cast_data['id']
-                 junctions = await client.get('video_cast', filters={'cast_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cast_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cast_vids:
-                             for v in cast_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cast
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     # Boost existing candidate
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cast
+        # 1. Get IDs for top 3 cast members
+        top_cast = cast[:3]
+        cast_names_filter = ','.join(f'"{name}"' for name in top_cast)
 
-    # D. Same Categories
+        cast_data = await client.get(
+            'cast_members',
+            select='id',
+            filters={'name': f'in.({cast_names_filter})'}
+        )
+
+        if cast_data:
+            cast_ids = [str(c['id']) for c in cast_data]
+            cast_ids_filter = ','.join(cast_ids)
+
+            # 2. Get video codes for these cast members
+            junctions = await client.get(
+                'video_cast',
+                select='video_code',
+                filters={'cast_id': f'in.({cast_ids_filter})'},
+                limit=50  # Reasonable limit for candidate pool
+            )
+
+            if junctions:
+                for j in junctions:
+                    c_code = j['video_code']
+                    if c_code not in seen_codes:
+                        # Add score (accumulative if multiple cast members match)
+                        video_scores[c_code] += w_cast
+
+    # D. Same Categories (Optimized: Batch Fetch)
     if categories:
-        for cat_name in categories[:3]:
-             cat_data = await client.get('categories', filters={'name': f'eq.{cat_name}'}, single=True)
-             if cat_data:
-                 c_id = cat_data['id']
-                 junctions = await client.get('video_categories', filters={'category_id': f'eq.{c_id}'}, limit=5)
-                 if junctions:
-                     codes = [j['video_code'] for j in junctions]
-                     needed_codes = [c for c in codes if c not in seen_codes]
-                     if needed_codes:
-                         codes_filter = ','.join(f'"{c}"' for c in needed_codes)
-                         cat_vids = await client.get('videos', filters={'code': f'in.({codes_filter})'})
-                         if cat_vids:
-                             for v in cat_vids:
-                                 if v['code'] not in seen_codes:
-                                     v['_score'] = w_cat
-                                     candidates.append(v)
-                                     seen_codes.add(v['code'])
-                                 else:
-                                     for cand in candidates:
-                                         if cand['code'] == v['code']:
-                                             cand['_score'] += w_cat
+        # 1. Get IDs for top 3 categories
+        top_cats = categories[:3]
+        cat_names_filter = ','.join(f'"{name}"' for name in top_cats)
 
-    # Refine Scores
-    import math
-    for v in candidates:
-        # Add popularity score
-        views = v.get('views', 0)
-        pop_score = math.log10(max(views, 1) + 1) * w_pop
-        v['_score'] += pop_score
+        cat_data = await client.get(
+            'categories',
+            select='id',
+            filters={'name': f'in.({cat_names_filter})'}
+        )
+
+        if cat_data:
+            cat_ids = [str(c['id']) for c in cat_data]
+            cat_ids_filter = ','.join(cat_ids)
+
+            # 2. Get video codes
+            junctions = await client.get(
+                'video_categories',
+                select='video_code',
+                filters={'category_id': f'in.({cat_ids_filter})'},
+                limit=50
+            )
+
+            if junctions:
+                for j in junctions:
+                    c_code = j['video_code']
+                    if c_code not in seen_codes:
+                        video_scores[c_code] += w_cat
+
+    # Collect all candidate codes
+    candidate_codes = [c for c in video_scores.keys() if c not in seen_codes]
+
+    # Fetch details for all candidates in one go
+    # Limit total candidates to prevent huge query
+    if len(candidate_codes) > 60:
+        # Keep top scoring ones only
+        # We only have partial scores (without popularity) but good enough for pre-filtering
+        candidate_codes.sort(key=lambda c: video_scores[c], reverse=True)
+        candidate_codes = candidate_codes[:60]
+
+    final_candidates = []
+
+    if candidate_codes:
+        codes_filter = ','.join(f'"{c}"' for c in candidate_codes)
+        videos = await client.get(
+            'videos',
+            select='code,title,thumbnail_url,duration,release_date,studio,views',
+            filters={'code': f'in.({codes_filter})'}
+        )
+
+        if videos:
+            import math
+            for v in videos:
+                code = v['code']
+                base_score = video_scores.get(code, 0)
+
+                # Add popularity score
+                views = v.get('views', 0)
+                pop_score = math.log10(max(views, 1) + 1) * w_pop
+
+                v['_score'] = base_score + pop_score
+                final_candidates.append(v)
 
     # Sort
-    candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
+    final_candidates.sort(key=lambda x: x.get('_score', 0), reverse=True)
 
     # Fill if not enough
-    if len(candidates) < limit:
+    if len(final_candidates) < limit:
         # Fetch popular/trending to fill
-        needed = limit - len(candidates)
+        needed = limit - len(final_candidates)
         filler = await client.get('videos', order='views.desc', limit=needed + 10)
         if filler:
             for v in filler:
-                if len(candidates) >= limit:
+                if len(final_candidates) >= limit:
                     break
-                if v['code'] not in seen_codes:
-                    candidates.append(v)
+                if v['code'] not in seen_codes and v['code'] not in video_scores:
+                    final_candidates.append(v)
                     seen_codes.add(v['code'])
 
     # Limit
-    final_items = candidates[:limit]
+    final_items = final_candidates[:limit]
 
     # Convert to items
     items = await _videos_to_list_items(final_items)
 
-    return await _paginate(items, len(candidates), 1, limit)
+    return await _paginate(items, len(final_candidates), 1, limit)
