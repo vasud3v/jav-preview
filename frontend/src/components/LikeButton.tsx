@@ -165,14 +165,14 @@ export default function LikeButton({
       <div className="heart-container" title={liked ? 'Unlike' : 'Like'}>
         <input
           type="checkbox"
-          className="heart-checkbox"
+          className="heart-checkbox peer"
           checked={liked}
           onChange={handleLike}
           disabled={isPending}
           aria-label={liked ? 'Unlike this video' : 'Like this video'}
           aria-pressed={liked}
         />
-        <div className="svg-container">
+        <div className="svg-container peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:rounded-full">
           <svg 
             viewBox="0 0 24 24" 
             className="svg-outline" 
