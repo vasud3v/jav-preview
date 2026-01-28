@@ -50,7 +50,6 @@ const VideoCard = memo(function VideoCard({
   video, 
   onClick, 
   highlightColor,
-  priority = 'normal'
 }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
@@ -95,12 +94,26 @@ const VideoCard = memo(function VideoCard({
     }
   }, [onClick, video.code, navigate]);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleClick();
+    }
+  }, [handleClick]);
+
   const handleImageError = useCallback(() => {
     setImageError(true);
   }, []);
 
   return (
-    <div className="group cursor-pointer" onClick={handleClick}>
+    <div
+      className="group cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="link"
+      tabIndex={0}
+      aria-label={`View ${video.title}`}
+    >
       {/* Thumbnail */}
       <div className="relative rounded-lg overflow-hidden mb-2 aspect-[2/3] bg-gradient-to-br from-zinc-900 to-zinc-800">
         {thumbnailUrl && !imageError ? (
