@@ -4,7 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
 from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
@@ -47,6 +47,40 @@ LIKE_WEIGHT_IN_TRENDING = 0.4  # Increased from 0.3 for more like influence
 LIKE_RATIO_BOOST = 3.0  # Increased from 2.0 for better like ratio impact
 VIEW_VELOCITY_WEIGHT = 0.6  # Weight for view velocity in trending
 RECENCY_BOOST_FACTOR = 1.5  # Boost factor for recent content
+
+
+def _sanitize_search_query(query: str) -> str:
+    """Sanitize search query to prevent PostgREST syntax errors."""
+    if not query:
+        return ""
+    # Remove characters that might break PostgREST syntax if not properly escaped
+    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
+    return safe_query.strip()
+
+
+def days_since_release(release_date_str: str) -> int:
+    """Calculate days since release date string."""
+    try:
+        if not release_date_str:
+            return 999999
+
+        # Handle simple date strings (YYYY-MM-DD)
+        if len(release_date_str) == 10 and 'T' not in release_date_str:
+             release_date_str += "T00:00:00+00:00"
+
+        release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
+
+        # Make sure we use UTC for comparison
+        now = datetime.now(timezone.utc)
+
+        # If release_date is naive, assume UTC
+        if release_date.tzinfo is None:
+            release_date = release_date.replace(tzinfo=timezone.utc)
+
+        return (now - release_date).days
+    except Exception as e:
+        print(f"Error parsing date {release_date_str}: {e}")
+        return 999999
 
 
 async def _get_ratings_for_videos(video_codes: list) -> dict:
@@ -371,12 +405,12 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     
     offset = (page - 1) * page_size
     
+    # Sanitize query
+    safe_query = _sanitize_search_query(query)
+    search_term = f'*{safe_query}*'
+
     # Use ilike for case-insensitive search
     # Search in title, code, description
-    # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
-    
-    # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
@@ -429,6 +463,15 @@ async def get_videos_by_category(category: str, page: int = 1, page_size: int = 
         order='release_date.desc'
     )
     
+    # Adjust total if we found fewer videos than junctions (orphaned records)
+    if len(videos) < len(codes):
+        # Calculate how many orphans we found on this page
+        orphans_on_page = len(codes) - len(videos)
+        # Adjust total to reflect that these records don't exist
+        # This is a best-effort fix for the current view
+        if total >= orphans_on_page:
+            total -= orphans_on_page
+
     items = await _videos_to_list_items(videos)
     return await _paginate(items, total, page, page_size)
 
@@ -468,6 +511,12 @@ async def get_videos_by_cast(cast_name: str, page: int = 1, page_size: int = 20)
         order='release_date.desc'
     )
     
+    # Adjust total if we found fewer videos than junctions (orphaned records)
+    if len(videos) < len(codes):
+        orphans_on_page = len(codes) - len(videos)
+        if total >= orphans_on_page:
+            total -= orphans_on_page
+
     items = await _videos_to_list_items(videos)
     return await _paginate(items, total, page, page_size)
 
@@ -792,15 +841,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             result.append(await _video_to_list_item(v, rating_info, like_count))
         
         return result
-    
-    # Helper to calculate days since release
-    def days_since_release(release_date_str: str) -> int:
-        try:
-            from datetime import datetime
-            release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
-        except:
-            return 999999
     
     # Helper to score videos with multiple factors
     def calculate_quality_score(video: dict, like_count: int = 0) -> float:
@@ -1859,9 +1899,8 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
     client = get_supabase_rest()
 
     # Sanitize query to prevent filter syntax errors
-    # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
-    search_term = f'*{safe_query.strip()}*'
+    safe_query = _sanitize_search_query(query)
+    search_term = f'*{safe_query}*'
 
     # Fetch videos matching query (larger limit for facets)
     videos = await client.get(
@@ -2026,7 +2065,8 @@ async def advanced_search(
             filters['release_date'] = f'lte.{date_to}'
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        safe_query = _sanitize_search_query(query)
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {

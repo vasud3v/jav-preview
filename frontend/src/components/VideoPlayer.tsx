@@ -457,6 +457,12 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
           onMouseDown={handleDragStart}
           onMouseMove={handleProgressHover}
           onMouseLeave={handleProgressLeave}
+          role="slider"
+          aria-label="Video progress"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          tabIndex={0}
         >
           {/* Preview thumbnail - always mounted for HLS persistence */}
           <div
@@ -584,6 +590,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={() => skip(-3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
+              aria-label="Skip back 3 seconds"
             >
               <SkipBack className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
@@ -595,6 +602,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               style={{
                 background: isPlaying ? `${color.hex}15` : `${color.hex}15`,
               }}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause
@@ -610,13 +618,14 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={() => skip(3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
+              aria-label="Skip forward 3 seconds"
             >
               <SkipForward className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
 
             {/* Volume */}
             <div className="flex items-center group/volume ml-2">
-              <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer">
+              <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer" aria-label={isMuted ? "Unmute" : "Mute"}>
                 <VolumeIcon className="w-5 h-5 text-white/80" />
               </button>
               <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 ease-out">
@@ -633,6 +642,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                   <input
                     type="range" min="0" max="1" step="0.02" value={isMuted ? 0 : volume} onChange={handleVolumeChange}
                     className="absolute w-full h-6 cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
+                    aria-label="Volume control"
                   />
                 </div>
               </div>
@@ -657,6 +667,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               <button
                 onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowQualityMenu(false); }}
                 className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2"
+                aria-label="Playback speed"
               >
                 <span
                   className="text-sm font-semibold tabular-nums"
@@ -688,6 +699,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 <button
                   onClick={() => { setShowQualityMenu(!showQualityMenu); setShowSpeedMenu(false); }}
                   className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                  aria-label="Video quality"
                 >
                   <Settings className="w-4 h-4 text-white/80" />
                   <span className="text-white/80 text-sm hidden sm:inline">{currentQuality === -1 ? 'Auto' : `${qualities.find(q => q.index === currentQuality)?.height}p`}</span>
@@ -722,6 +734,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={toggleFullscreen}
               className="p-2.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer group/btn ml-1"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               {isFullscreen ? (
                 <Minimize className="w-5 h-5 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />

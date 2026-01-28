@@ -7,7 +7,12 @@ import uuid
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp"
+}
 MAX_SIZE = 5 * 1024 * 1024  # 5MB
 
 
@@ -36,8 +41,8 @@ async def upload_avatar(
     if len(content) > MAX_SIZE:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB.")
     
-    # Generate unique filename
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    # Generate unique filename using safe extension
+    ext = ALLOWED_TYPES[file.content_type]
     filename = f"{user['id']}/{uuid.uuid4()}.{ext}"
     
     try:
