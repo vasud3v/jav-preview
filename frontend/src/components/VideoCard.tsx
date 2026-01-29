@@ -3,7 +3,7 @@
  * Uses lazy loading with single intersection observer
  */
 
-import { useState, memo, useCallback, useMemo } from 'react';
+import { useState, memo, useCallback, useMemo, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, Eye, Star, Film } from 'lucide-react';
 import type { VideoListItem } from '@/lib/api';
@@ -95,7 +95,10 @@ const VideoCard = memo(function VideoCard({
     }
   }, [onClick, video.code, navigate]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Prevent navigation when interacting with nested controls
+    if (e.target !== e.currentTarget) return;
+
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleClick();
