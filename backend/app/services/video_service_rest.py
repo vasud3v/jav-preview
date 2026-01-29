@@ -4,6 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
@@ -2397,7 +2398,6 @@ async def get_related_videos(
     source_series = video.get('series')
 
     # 2. Build candidates based on strategy
-    from collections import defaultdict
     video_scores = defaultdict(float) # code -> score
     seen_codes = {code} # Exclude source video
 
@@ -2466,66 +2466,64 @@ async def get_related_videos(
                     video_scores[v['code']] += w_studio
 
     # C. Same Cast (Batched)
-    if cast:
-        # 1. Get IDs for up to 3 cast names
-        top_cast = cast[:3]
-        if top_cast:
-            # Escape and join names
-            cast_filter = ','.join(f'"{name.replace("\"", "")}"' for name in top_cast)
-            cast_members = await client.get(
-                'cast_members',
-                select='id',
-                filters={'name': f'in.({cast_filter})'}
+    # 1. Get IDs for up to 3 cast names
+    top_cast = cast[:3] if cast else []
+    if top_cast:
+        # Escape and join names
+        cast_filter = ','.join(f'"{name.replace("\"", "")}"' for name in top_cast)
+        cast_members = await client.get(
+            'cast_members',
+            select='id',
+            filters={'name': f'in.({cast_filter})'}
+        )
+
+        if cast_members:
+            cast_ids = [str(c['id']) for c in cast_members]
+            cast_ids_filter = ','.join(cast_ids)
+
+            # 2. Get video junctions for these IDs
+            # Fetch more because we might filter duplicates or seen ones
+            junctions = await client.get(
+                'video_cast',
+                select='video_code',
+                filters={'cast_id': f'in.({cast_ids_filter})'},
+                limit=50
             )
 
-            if cast_members:
-                cast_ids = [str(c['id']) for c in cast_members]
-                cast_ids_filter = ','.join(cast_ids)
-
-                # 2. Get video junctions for these IDs
-                # Fetch more because we might filter duplicates or seen ones
-                junctions = await client.get(
-                    'video_cast',
-                    select='video_code',
-                    filters={'cast_id': f'in.({cast_ids_filter})'},
-                    limit=50
-                )
-
-                if junctions:
-                    for j in junctions:
-                        c_code = j.get('video_code')
-                        if c_code and c_code not in seen_codes:
-                            video_scores[c_code] += w_cast
+            if junctions:
+                for j in junctions:
+                    c_code = j.get('video_code')
+                    if c_code and c_code not in seen_codes:
+                        video_scores[c_code] += w_cast
 
     # D. Same Categories (Batched)
-    if categories:
-        # 1. Get IDs for up to 3 categories
-        top_cats = categories[:3]
-        if top_cats:
-            cat_filter = ','.join(f'"{name.replace("\"", "")}"' for name in top_cats)
-            cat_members = await client.get(
-                'categories',
-                select='id',
-                filters={'name': f'in.({cat_filter})'}
+    # 1. Get IDs for up to 3 categories
+    top_cats = categories[:3] if categories else []
+    if top_cats:
+        cat_filter = ','.join(f'"{name.replace("\"", "")}"' for name in top_cats)
+        cat_members = await client.get(
+            'categories',
+            select='id',
+            filters={'name': f'in.({cat_filter})'}
+        )
+
+        if cat_members:
+            cat_ids = [str(c['id']) for c in cat_members]
+            cat_ids_filter = ','.join(cat_ids)
+
+            # 2. Get video junctions
+            junctions = await client.get(
+                'video_categories',
+                select='video_code',
+                filters={'category_id': f'in.({cat_ids_filter})'},
+                limit=50
             )
 
-            if cat_members:
-                cat_ids = [str(c['id']) for c in cat_members]
-                cat_ids_filter = ','.join(cat_ids)
-
-                # 2. Get video junctions
-                junctions = await client.get(
-                    'video_categories',
-                    select='video_code',
-                    filters={'category_id': f'in.({cat_ids_filter})'},
-                    limit=50
-                )
-
-                if junctions:
-                    for j in junctions:
-                        c_code = j.get('video_code')
-                        if c_code and c_code not in seen_codes:
-                            video_scores[c_code] += w_cat
+            if junctions:
+                for j in junctions:
+                    c_code = j.get('video_code')
+                    if c_code and c_code not in seen_codes:
+                        video_scores[c_code] += w_cat
 
     # Select top candidates to fetch details for
     # Sort by accumulated score so far
@@ -2549,7 +2547,6 @@ async def get_related_videos(
                 v['_score'] = video_scores.get(v['code'], 0)
 
     # Refine Scores (add popularity)
-    import math
     for v in candidates:
         # Add popularity score
         views = v.get('views', 0)
