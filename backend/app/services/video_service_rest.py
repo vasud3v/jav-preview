@@ -806,7 +806,7 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime, timezone
+            # Use global datetime and timezone imports
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
             # Use UTC for current time to match release_date which is timezone-aware
             return (datetime.now(timezone.utc) - release_date).days
