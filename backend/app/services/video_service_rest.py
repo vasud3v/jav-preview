@@ -4,7 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
 from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
@@ -365,6 +365,16 @@ async def get_videos(
     return await _paginate(items, total, page, page_size)
 
 
+def _sanitize_search_query(query: str) -> str:
+    """Sanitize search query for PostgREST."""
+    if not query:
+        return ""
+    # Replace characters that break PostgREST filter syntax
+    # PostgREST uses . for operators and , for lists, () for grouping
+    # : is sometimes used in time filters or casting, though less critical here, but safe to remove
+    return query.replace('(', ' ').replace(')', ' ').replace(',', ' ').replace('.', ' ').replace(':', ' ').strip()
+
+
 async def search_videos(query: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
     """Search videos by title, code, or description."""
     client = get_supabase_rest()
@@ -374,7 +384,7 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    search_term = f'*{_sanitize_search_query(query)}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -796,9 +806,10 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
+            # Use UTC for current time to match release_date which is timezone-aware
+            return (datetime.now(timezone.utc) - release_date).days
         except:
             return 999999
     
@@ -1860,8 +1871,7 @@ async def _get_search_results_codes(query: str, limit: int = 500) -> List[dict]:
 
     # Sanitize query to prevent filter syntax errors
     # Remove characters that might break PostgREST syntax if not properly escaped
-    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ')
-    search_term = f'*{safe_query.strip()}*'
+    search_term = f'*{_sanitize_search_query(query)}*'
 
     # Fetch videos matching query (larger limit for facets)
     videos = await client.get(
