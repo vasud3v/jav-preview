@@ -4,7 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
@@ -69,7 +69,6 @@ async def _get_ratings_for_videos(video_codes: list) -> dict:
         return {}
     
     # Calculate stats per video
-    from collections import defaultdict
     rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
     
     for rating in ratings_data:
@@ -110,7 +109,6 @@ async def _get_likes_for_videos(video_codes: list) -> dict:
             return {}
         
         # Count likes per video
-        from collections import defaultdict
         like_counts = defaultdict(int)
         
         for like in likes_data:
@@ -637,7 +635,6 @@ async def get_top_rated_videos(page: int = 1, page_size: int = 10) -> PaginatedR
         
         if ratings_data and len(ratings_data) > 0:
             # Calculate average rating per video
-            from collections import defaultdict
             rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
             
             for rating in ratings_data:
@@ -750,7 +747,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     )
     
     # Pre-calculate rating stats
-    from collections import defaultdict, Counter
     rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
     if all_ratings_data:
         for rating in all_ratings_data:
@@ -760,10 +756,9 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             rating_stats[code]['count'] += 1
     
     # Pre-calculate like counts
-    from collections import Counter as CounterClass
-    like_counts = CounterClass()
+    like_counts = Counter()
     if all_likes_data:
-        like_counts = CounterClass(like['video_code'] for like in all_likes_data)
+        like_counts = Counter(like['video_code'] for like in all_likes_data)
     
     print(f"[HOME_FEED] Loaded {len(rating_stats)} videos with ratings, {len(like_counts)} videos with likes")
     print(f"[HOME_FEED] like_counts type: {type(like_counts).__name__}")
@@ -1646,7 +1641,6 @@ async def get_cast_with_images(limit: int = 100) -> List[dict]:
         return []
     
     # Count videos per cast
-    from collections import Counter
     cast_counts = Counter(vc['cast_id'] for vc in video_cast_data if vc.get('cast_id'))
     
     # Get top cast members (fetch more than needed for variety)
@@ -1745,7 +1739,6 @@ async def get_all_cast_with_images() -> List[dict]:
     video_cast_data = await client.get('video_cast', select='cast_id')
     
     # Count videos per cast
-    from collections import Counter
     cast_counts = Counter()
     if video_cast_data:
         cast_counts = Counter(vc['cast_id'] for vc in video_cast_data if vc.get('cast_id'))
@@ -2273,7 +2266,6 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
 
                 if all_cast_videos:
                     # Group videos by cast_id
-                    from collections import defaultdict
                     videos_by_cast = defaultdict(list)
                     for cv in all_cast_videos:
                         videos_by_cast[cv['cast_id']].append(cv['video_code'])
@@ -2307,7 +2299,6 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
                                 candidates.append(v)
         
         # 8. Score and rank candidates
-        import math
         for video in candidates:
             base_score = video.get('_score', 0)
             views = video.get('views', 0)
@@ -2317,7 +2308,6 @@ async def get_personalized_recommendations(user_id: str, page: int = 1, page_siz
             
             # Recency bonus (newer content gets slight boost)
             try:
-                from datetime import datetime
                 release_date = video.get('release_date', '')
                 if release_date:
                     days_old = (datetime.now() - datetime.fromisoformat(release_date.replace('Z', '+00:00'))).days
