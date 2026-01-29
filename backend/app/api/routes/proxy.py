@@ -5,6 +5,7 @@ import httpx
 from urllib.parse import unquote, quote, urlparse
 import hashlib
 import ipaddress
+import socket
 
 from app.core.cache import playlist_cache, segment_cache, image_cache
 
@@ -50,6 +51,21 @@ def cache_key(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
 
+def resolve_hostname(hostname: str) -> str:
+    """Resolve hostname to IP address."""
+    try:
+        # Use getaddrinfo to support IPv4 and IPv6
+        # We only need one result
+        info = socket.getaddrinfo(hostname, None)
+        if not info:
+            raise ValueError("No IP found")
+        # Return the first IP address found
+        return info[0][4][0]
+    except Exception:
+        # If resolution fails, we can't verify it, so we should block it or fail
+        raise HTTPException(status_code=400, detail="DNS resolution failed")
+
+
 def validate_url(url: str) -> str:
     """
     Validate URL to prevent SSRF and other attacks.
@@ -78,17 +94,25 @@ def validate_url(url: str) -> str:
     if hostname.lower() in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
         raise HTTPException(status_code=403, detail="Access to localhost denied")
 
-    # 2. Check for private IP addresses if hostname is an IP
+    # 2. Check for private IP addresses (including resolved ones)
     try:
-        ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
+        # If hostname is already an IP, ipaddress will work.
+        # If it's a domain, we need to resolve it.
+        try:
+            ip_obj = ipaddress.ip_address(hostname)
+        except ValueError:
+            # Not an IP, resolve it
+            resolved_ip = resolve_hostname(hostname)
+            ip_obj = ipaddress.ip_address(resolved_ip)
+
+        if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
             raise HTTPException(status_code=403, detail="Access to private IP denied")
-    except ValueError:
-        # Not an IP address, it's a domain name.
-        # Ideally we should resolve it and check the IP, but that adds latency.
-        # For now we rely on the fact that we trust the upstream DNS or that
-        # attackers can't easily make public DNS point to internal IPs in this context.
-        pass
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If ipaddress fails or other errors
+        raise HTTPException(status_code=400, detail=f"Invalid hostname: {str(e)}")
 
     return url
 
