@@ -1,0 +1,10 @@
+[build]
+  base = "frontend"
+  publish = "dist"
+  command = "pnpm run build"
+
+[context.production]
+  command = "pnpm run build"
+
+[context.deploy-preview]
+  command = "pnpm run build"
