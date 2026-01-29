@@ -3,7 +3,7 @@
  * Uses lazy loading with single intersection observer
  */
 
-import { useState, memo, useCallback, useMemo } from 'react';
+import { useState, memo, useCallback, useMemo, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Clock, Eye, Star, Film } from 'lucide-react';
 import type { VideoListItem } from '@/lib/api';
@@ -50,7 +50,7 @@ const VideoCard = memo(function VideoCard({
   video, 
   onClick, 
   highlightColor,
-  priority = 'normal'
+  // priority = 'normal' - unused, but kept in props interface for future use
 }: VideoCardProps) {
   const navigate = useNavigate();
   const [imageError, setImageError] = useState(false);
@@ -95,12 +95,29 @@ const VideoCard = memo(function VideoCard({
     }
   }, [onClick, video.code, navigate]);
 
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Prevent navigation when interacting with nested controls
+    if (e.target !== e.currentTarget) return;
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  }, [handleClick]);
+
   const handleImageError = useCallback(() => {
     setImageError(true);
   }, []);
 
   return (
-    <div className="group cursor-pointer" onClick={handleClick}>
+    <div
+      className="group cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="link"
+      tabIndex={0}
+      aria-label={`View details for ${video.title}`}
+    >
       {/* Thumbnail */}
       <div className="relative rounded-lg overflow-hidden mb-2 aspect-[2/3] bg-gradient-to-br from-zinc-900 to-zinc-800">
         {thumbnailUrl && !imageError ? (
