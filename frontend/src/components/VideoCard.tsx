@@ -109,6 +109,7 @@ const VideoCard = memo(function VideoCard({
             alt={video.title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={handleImageError}
+            loading={priority === 'high' ? 'eager' : 'lazy'}
           />
         ) : (
           /* Fallback when no image or error */
