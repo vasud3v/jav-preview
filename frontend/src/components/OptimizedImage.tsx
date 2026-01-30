@@ -1,6 +1,6 @@
 /**
- * Simple Image Component - No Lazy Loading
- * Loads all images immediately for maximum compatibility
+ * Simple Image Component
+ * Supports lazy loading via native loading attribute
  */
 
 import { useState, useRef, useEffect, memo } from 'react';
@@ -9,6 +9,7 @@ interface OptimizedImageProps {
   src: string;
   alt: string;
   className?: string;
+  loading?: 'eager' | 'lazy';
   onLoad?: () => void;
   onError?: () => void;
 }
@@ -17,6 +18,7 @@ const OptimizedImage = memo(function OptimizedImage({
   src,
   alt,
   className = '',
+  loading = 'lazy',
   onLoad,
   onError,
 }: OptimizedImageProps) {
@@ -65,7 +67,7 @@ const OptimizedImage = memo(function OptimizedImage({
 
   return (
     <div className="w-full h-full relative">
-      {/* Image - loads immediately, no lazy loading */}
+      {/* Image */}
       <img
         ref={imgRef}
         src={src}
@@ -73,7 +75,7 @@ const OptimizedImage = memo(function OptimizedImage({
         className={`w-full h-full ${className} ${status === 'loaded' ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
         onLoad={handleLoad}
         onError={handleError}
-        loading="eager"
+        loading={loading}
         decoding="async"
         draggable={false}
       />
