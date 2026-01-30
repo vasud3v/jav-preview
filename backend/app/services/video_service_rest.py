@@ -4,7 +4,7 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
 from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
@@ -796,9 +796,8 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
+            return (datetime.now(timezone.utc) - release_date).days
         except:
             return 999999
     
@@ -1195,25 +1194,37 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
 # ============================================
 
 async def increment_views(code: str) -> bool:
-    """Increment view count for a video."""
+    """Increment view count for a video with optimistic locking."""
     client = get_supabase_rest()
     
-    # Get current views
-    video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
-    if not video:
-        return False
-    
-    current_views = video.get('views') or 0
-    
-    # Update views
-    result = await client.update(
-        'videos',
-        {'views': current_views + 1},
-        filters={'code': f'eq.{code}'},
-        use_admin=True
-    )
-    
-    return result is not None
+    # Retry loop for optimistic locking
+    for _ in range(3):
+        # Get current views
+        video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
+        if not video:
+            return False
+
+        current_views = video.get('views') or 0
+
+        # Update views with optimistic locking (check if views hasn't changed)
+        result = await client.update(
+            'videos',
+            {'views': current_views + 1},
+            filters={
+                'code': f'eq.{code}',
+                'views': f'eq.{current_views}'
+            },
+            use_admin=True
+        )
+
+        # If result is truthy (non-empty list/dict), update was successful
+        if result:
+            return True
+
+        # If we get here, views changed between read and write, so we retry
+        await asyncio.sleep(0.1)
+
+    return False
 
 
 async def get_video_rating(code: str) -> dict:
