@@ -18,6 +18,33 @@ def get_storage_client():
     return get_supabase()
 
 
+async def validate_file_content(file: UploadFile) -> None:
+    """Validate file content using magic bytes."""
+    SIGNATURES = {
+        "image/jpeg": b"\xFF\xD8\xFF",
+        "image/png": b"\x89PNG\r\n\x1a\n",
+        "image/gif": b"GIF8",
+        "image/webp": b"RIFF",
+    }
+
+    # Read first 12 bytes
+    header = await file.read(12)
+    # Reset file pointer
+    await file.seek(0)
+
+    content_type = file.content_type
+    if content_type not in SIGNATURES:
+        return
+
+    signature = SIGNATURES[content_type]
+
+    if content_type == "image/webp":
+        if len(header) < 12 or not (header.startswith(b"RIFF") and header[8:12] == b"WEBP"):
+             raise HTTPException(status_code=400, detail="Invalid WebP file content")
+    elif not header.startswith(signature):
+        raise HTTPException(status_code=400, detail="File content does not match extension")
+
+
 @router.post("/avatar")
 async def upload_avatar(
     file: UploadFile = File(...),
@@ -29,6 +56,9 @@ async def upload_avatar(
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type. Use JPEG, PNG, GIF, or WebP.")
     
+    # Validate magic bytes
+    await validate_file_content(file)
+
     # Read file content
     content = await file.read()
     
