@@ -927,12 +927,10 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # Get like counts for featured candidates
     if featured_candidates:
-        featured_codes = [v['code'] for v in featured_candidates]
-        featured_likes = await _get_likes_for_videos(featured_codes)
-        
         # Score and sort by quality (including like ratio)
         for video in featured_candidates:
-            like_count = featured_likes.get(video['code'], 0)
+            # OPTIMIZED: Use pre-fetched likes
+            like_count = like_counts.get(video['code'], 0)
             video['_score'] = calculate_quality_score(video, like_count)
         featured_candidates.sort(key=lambda x: x['_score'], reverse=True)
     
@@ -953,14 +951,12 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # Get like counts for trending candidates
     if trending_candidates:
-        trending_codes = [v['code'] for v in trending_candidates]
-        trending_likes = await _get_likes_for_videos(trending_codes)
-        
         # Enhanced trending score calculation
         for video in trending_candidates:
             days_old = days_since_release(video.get('scraped_at', ''))
             views = video.get('views', 0)
-            likes = trending_likes.get(video['code'], 0)
+            # OPTIMIZED: Use pre-fetched likes
+            likes = like_counts.get(video['code'], 0)
             
             # Prevent division by zero
             days_old = max(days_old, 0.5)  # Minimum 0.5 days
@@ -1076,12 +1072,10 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # Score classics by views and quality
     if classics_candidates:
-        classics_codes = [v['code'] for v in classics_candidates]
-        classics_section_likes = await _get_likes_for_videos(classics_codes)
-        
         for video in classics_candidates:
             views = video.get('views', 0)
-            likes = classics_section_likes.get(video['code'], 0)
+            # OPTIMIZED: Use pre-fetched likes
+            likes = like_counts.get(video['code'], 0)
             has_thumbnail = bool(video.get('thumbnail_url'))
             has_duration = bool(video.get('duration'))
             
