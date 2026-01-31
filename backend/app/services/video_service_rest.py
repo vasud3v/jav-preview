@@ -4,7 +4,10 @@ Replaces SQLAlchemy-based video_service.py for Railway deployment.
 """
 import asyncio
 import math
-from datetime import datetime, timedelta
+import random
+import traceback
+from collections import defaultdict, Counter
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from app.core.supabase_rest_client import get_supabase_rest
 from app.schemas import VideoListItem, VideoResponse, PaginatedResponse, HomeFeedResponse
@@ -68,7 +71,6 @@ async def _get_ratings_for_videos(video_codes: list) -> dict:
         return {}
     
     # Calculate stats per video
-    from collections import defaultdict
     rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
     
     for rating in ratings_data:
@@ -109,7 +111,6 @@ async def _get_likes_for_videos(video_codes: list) -> dict:
             return {}
         
         # Count likes per video
-        from collections import defaultdict
         like_counts = defaultdict(int)
         
         for like in likes_data:
@@ -312,7 +313,6 @@ async def get_random_video_code(exclude: List[str] = None) -> Optional[str]:
         return None
     
     # Get random offset
-    import random
     offset = random.randint(0, max(0, count - 1))
     
     videos = await client.get(
@@ -374,7 +374,9 @@ async def search_videos(query: str, page: int = 1, page_size: int = 20) -> Pagin
     # Use ilike for case-insensitive search
     # Search in title, code, description
     # Note: Supabase REST API doesn't support OR filters directly, so we'll use code or title
-    search_term = f'*{query}*'
+    # Sanitize query to prevent PostgREST syntax errors
+    safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ').replace('.', ' ').replace(':', ' ')
+    search_term = f'*{safe_query.strip()}*'
     
     # Try to search by code first (exact-ish match)
     videos, total = await client.get_with_count(
@@ -599,7 +601,7 @@ async def get_featured_videos(page: int = 1, page_size: int = 10) -> PaginatedRe
     videos = await client.get(
         'videos',
         select='code,title,thumbnail_url,duration,release_date,studio,views',
-        filters={'thumbnail_url': 'neq.'},
+        filters={'thumbnail_url': 'neq.', 'cover_url': 'neq.'},
         order='scraped_at.desc',
         limit=page_size,
         offset=offset + 200  # Skip first 200 videos
@@ -636,7 +638,6 @@ async def get_top_rated_videos(page: int = 1, page_size: int = 10) -> PaginatedR
         
         if ratings_data and len(ratings_data) > 0:
             # Calculate average rating per video
-            from collections import defaultdict
             rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
             
             for rating in ratings_data:
@@ -689,6 +690,7 @@ async def get_top_rated_videos(page: int = 1, page_size: int = 10) -> PaginatedR
         
     except Exception as e:
         print(f"Error fetching top rated: {e}")
+        traceback.print_exc()
         # Fallback to high view count videos
         videos = await client.get(
             'videos',
@@ -749,7 +751,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     )
     
     # Pre-calculate rating stats
-    from collections import defaultdict, Counter
     rating_stats = defaultdict(lambda: {'sum': 0, 'count': 0})
     if all_ratings_data:
         for rating in all_ratings_data:
@@ -759,10 +760,9 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             rating_stats[code]['count'] += 1
     
     # Pre-calculate like counts
-    from collections import Counter as CounterClass
-    like_counts = CounterClass()
+    like_counts = Counter()
     if all_likes_data:
-        like_counts = CounterClass(like['video_code'] for like in all_likes_data)
+        like_counts = Counter(like['video_code'] for like in all_likes_data)
     
     print(f"[HOME_FEED] Loaded {len(rating_stats)} videos with ratings, {len(like_counts)} videos with likes")
     print(f"[HOME_FEED] like_counts type: {type(like_counts).__name__}")
@@ -796,9 +796,9 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     # Helper to calculate days since release
     def days_since_release(release_date_str: str) -> int:
         try:
-            from datetime import datetime
+            # Bug fix: use UTC now to match offset-aware dates
             release_date = datetime.fromisoformat(release_date_str.replace('Z', '+00:00'))
-            return (datetime.now() - release_date).days
+            return (datetime.now(timezone.utc) - release_date).days
         except:
             return 999999
     
@@ -818,7 +818,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             return 0
         
         # Base score from views (logarithmic to prevent dominance)
-        import math
         view_score = math.log10(max(views, 1) + 1) * 15  # Increased weight
         
         # Quality bonus - better content gets higher scores
@@ -902,7 +901,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             )
     except Exception as e:
         print(f"[TOP_RATED] Error: {e}")
-        import traceback
         traceback.print_exc()
         top_rated_candidates = await client.get(
             'videos',
@@ -940,7 +938,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
     
     # 3. TRENDING - Recent content with growing engagement
     # Prioritize videos from last 30 days with good view velocity AND like velocity
-    from datetime import datetime, timedelta
     thirty_days_ago = (datetime.now() - timedelta(days=TRENDING_WINDOW_DAYS)).isoformat()
     
     trending_candidates = await client.get(
@@ -1086,7 +1083,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             has_duration = bool(video.get('duration'))
             
             # Base score from views
-            import math
             base_score = math.log10(max(views, 1) + 1) * 20
             
             # Quality multiplier
@@ -1141,7 +1137,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
                     print(f"[MOST_LIKED] Candidate codes: {[v['code'] for v in most_liked_candidates]}")
                     
                     # Score by like count, engagement rate, and quality
-                    import math
                     for video in most_liked_candidates:
                         code = video['code']
                         likes = like_counts[code]
@@ -1174,7 +1169,6 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
             print("[MOST_LIKED] like_counts is empty or falsy")
     except Exception as e:
         print(f"[MOST_LIKED] Error: {e}")
-        import traceback
         traceback.print_exc()
     
     print(f"[HOME_FEED] Returning: Featured={len(featured)}, Trending={len(trending)}, Popular={len(popular)}, TopRated={len(top_rated)}, MostLiked={len(most_liked)}, NewReleases={len(new_releases)}, Classics={len(classics)}")
@@ -1195,25 +1189,37 @@ async def get_home_feed(user_id: str) -> HomeFeedResponse:
 # ============================================
 
 async def increment_views(code: str) -> bool:
-    """Increment view count for a video."""
+    """Increment view count for a video with optimistic locking."""
     client = get_supabase_rest()
     
-    # Get current views
-    video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
-    if not video:
-        return False
-    
-    current_views = video.get('views') or 0
-    
-    # Update views
-    result = await client.update(
-        'videos',
-        {'views': current_views + 1},
-        filters={'code': f'eq.{code}'},
-        use_admin=True
-    )
-    
-    return result is not None
+    MAX_RETRIES = 3
+    for attempt in range(MAX_RETRIES):
+        # Get current views
+        video = await client.get('videos', select='views', filters={'code': f'eq.{code}'}, single=True)
+        if not video:
+            return False
+
+        current_views = video.get('views') or 0
+
+        # Update views using optimistic locking (verify value hasn't changed)
+        # Note: We can't easily check affected rows count with this REST client wrapper
+        # unless update returns the row. 'return=representation' is default.
+        result = await client.update(
+            'videos',
+            {'views': current_views + 1},
+            filters={'code': f'eq.{code}', 'views': f'eq.{current_views}'},
+            use_admin=True
+        )
+
+        if result:
+            return True
+
+        # If result is empty/None, it means the row wasn't updated (concurrent modification or deleted)
+        # Wait a bit before retrying
+        if attempt < MAX_RETRIES - 1:
+            await asyncio.sleep(0.1 * (attempt + 1))
+
+    return False
 
 
 async def get_video_rating(code: str) -> dict:
@@ -1714,8 +1720,6 @@ async def get_cast_with_images(limit: int = 100) -> List[dict]:
     
     # Add some variety: take top 70% by popularity, then shuffle the rest
     if len(result) > limit:
-        import random
-        
         # Take top performers (70% of limit)
         top_count = int(limit * 0.7)
         top_cast = result[:top_count]
@@ -2016,17 +2020,25 @@ async def advanced_search(
         filters['studio'] = f'eq.{studio}'
     if series:
         filters['series'] = f'eq.{series}'
+
+    # Date range logic
+    date_filters = []
     if date_from:
-        filters['release_date'] = f'gte.{date_from}'
+        date_filters.append(f'gte.{date_from}')
     if date_to:
-        if 'release_date' in filters:
-            # Can't combine gte and lte in same key
-            pass
-        else:
-            filters['release_date'] = f'lte.{date_to}'
+        date_filters.append(f'lte.{date_to}')
+
+    if len(date_filters) == 2:
+        # Use 'and' logic for range
+        filters['and'] = f'(release_date.{date_filters[0]},release_date.{date_filters[1]})'
+    elif len(date_filters) == 1:
+        # Just use the single filter
+        filters['release_date'] = date_filters[0]
     
     if query:
-        filters['or'] = f'(code.ilike.*{query}*,title.ilike.*{query}*,description.ilike.*{query}*)'
+        # Sanitize query
+        safe_query = query.replace('(', ' ').replace(')', ' ').replace(',', ' ').replace('.', ' ').replace(':', ' ')
+        filters['or'] = f'(code.ilike.*{safe_query}*,title.ilike.*{safe_query}*,description.ilike.*{safe_query}*)'
     
     # Determine order
     order_map = {
