@@ -189,8 +189,15 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const [showSkipIndicator, setShowSkipIndicator] = useState<'back' | 'forward' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const updateBuffered = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !video.buffered.length || !video.duration) return;
+    setBuffered((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!video || !primarySource) { setLoading(false); return; }
     if (initializedUrlRef.current === primarySource) return;
     initializedUrlRef.current = primarySource;
@@ -244,13 +251,7 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
       } else { setLoading(false); setError('HLS not supported'); }
     } else { video.src = proxiedUrl; }
     return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } initializedUrlRef.current = null; };
-  }, [primarySource]);
-
-  const updateBuffered = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || !video.buffered.length || !video.duration) return;
-    setBuffered((video.buffered.end(video.buffered.length - 1) / video.duration) * 100);
-  }, []);
+  }, [primarySource, updateBuffered]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -278,7 +279,16 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const togglePlay = useCallback(() => { const v = videoRef.current; if (v) v.paused ? v.play().catch(() => { }) : v.pause(); }, []);
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (v) {
+      if (v.paused) {
+        v.play().catch(() => { });
+      } else {
+        v.pause();
+      }
+    }
+  }, []);
   const toggleMute = useCallback(() => { const v = videoRef.current; if (v) { v.muted = !v.muted; setIsMuted(v.muted); } }, []);
   const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { const v = videoRef.current; if (!v) return; const vol = parseFloat(e.target.value); v.volume = vol; setVolume(vol); setIsMuted(vol === 0); v.muted = vol === 0; }, []);
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -341,7 +351,16 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
   const handleProgressLeave = useCallback(() => {
     setHoverTime(null);
   }, []);
-  const toggleFullscreen = useCallback(() => { const c = containerRef.current; if (c) document.fullscreenElement ? document.exitFullscreen().catch(() => { }) : c.requestFullscreen().catch(() => { }); }, []);
+  const toggleFullscreen = useCallback(() => {
+    const c = containerRef.current;
+    if (c) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => { });
+      } else {
+        c.requestFullscreen().catch(() => { });
+      }
+    }
+  }, []);
   const handleMouseMove = useCallback(() => { setShowControls(true); if (hideControlsTimeout.current) clearTimeout(hideControlsTimeout.current); hideControlsTimeout.current = setTimeout(() => { if (isPlaying) setShowControls(false); }, 3000); }, [isPlaying]);
   const handleQualityChange = useCallback((i: number) => { if (hlsRef.current) { hlsRef.current.currentLevel = i; setCurrentQuality(i); } setShowQualityMenu(false); }, []);
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -584,6 +603,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={() => skip(-3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
+              aria-label="Skip back 3 seconds"
+              title="Skip back 3 seconds"
             >
               <SkipBack className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
@@ -595,6 +616,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               style={{
                 background: isPlaying ? `${color.hex}15` : `${color.hex}15`,
               }}
+              aria-label={isPlaying ? "Pause" : "Play"}
+              title={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (
                 <Pause
@@ -610,13 +633,20 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={() => skip(3)}
               className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer group/btn"
+              aria-label="Skip forward 3 seconds"
+              title="Skip forward 3 seconds"
             >
               <SkipForward className="w-4 h-4 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
             </button>
 
             {/* Volume */}
             <div className="flex items-center group/volume ml-2">
-              <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer">
+              <button
+                onClick={toggleMute}
+                className="p-2 rounded-full hover:bg-white/10 transition-all cursor-pointer"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
                 <VolumeIcon className="w-5 h-5 text-white/80" />
               </button>
               <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 ease-out">
@@ -657,6 +687,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
               <button
                 onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowQualityMenu(false); }}
                 className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2"
+                aria-label="Playback speed"
+                title="Playback speed"
               >
                 <span
                   className="text-sm font-semibold tabular-nums"
@@ -688,6 +720,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
                 <button
                   onClick={() => { setShowQualityMenu(!showQualityMenu); setShowSpeedMenu(false); }}
                   className="px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
+                  aria-label="Video quality"
+                  title="Video quality"
                 >
                   <Settings className="w-4 h-4 text-white/80" />
                   <span className="text-white/80 text-sm hidden sm:inline">{currentQuality === -1 ? 'Auto' : `${qualities.find(q => q.index === currentQuality)?.height}p`}</span>
@@ -722,6 +756,8 @@ export default function VideoPlayer({ sources, poster }: VideoPlayerProps) {
             <button
               onClick={toggleFullscreen}
               className="p-2.5 rounded-lg hover:bg-white/10 transition-all cursor-pointer group/btn ml-1"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               {isFullscreen ? (
                 <Minimize className="w-5 h-5 text-white/80 group-hover/btn:text-white group-hover/btn:scale-110 transition-all" />
